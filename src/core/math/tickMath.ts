@@ -142,14 +142,27 @@ export function oneSidedTicks(
 ): TickRange {
   if (!(pct > 0) || pct >= 100) throw new Error('One-sided width must be between 0 and 100%');
   const current = priceToTick(currentPrice, dec0, dec1);
-  const width = Math.max(spacing, Math.round(Math.log(1 + pct / 100) / LOG_1_0001 / spacing) * spacing);
+
+  // The far end is the requested distance from the **live price**, not from the
+  // aligned near end. Adding the width to the near end instead would make the
+  // range narrower than it was asked to be whenever the price does not sit
+  // exactly on a tick boundary — and with a wide tick spacing (1000 ticks is
+  // 10.5% a step) a 50% range came out as a 33% one.
+  const farPrice = above ? currentPrice * (1 + pct / 100) : currentPrice * (1 - pct / 100);
+  const far = priceToTick(farPrice, dec0, dec1);
 
   if (above) {
+    // The range sits above the price: the near bound is aligned up, the far
+    // bound is aligned up as well, so the range is at least as wide as asked.
     const tickLower = alignTickUp(current, spacing);
-    return { tickLower, tickUpper: clampTick(tickLower + width) };
+    const tickUpper = Math.max(tickLower + spacing, alignTickUp(far, spacing));
+    return { tickLower, tickUpper: clampTick(tickUpper) };
   }
+  // The range sits below the price: the near bound is the upper one, aligned
+  // down; the far bound is aligned down as well.
   const tickUpper = alignTickDown(current, spacing);
-  return { tickLower: clampTick(tickUpper - width), tickUpper };
+  const tickLower = Math.min(tickUpper - spacing, alignTickDown(far, spacing));
+  return { tickLower: clampTick(tickLower), tickUpper };
 }
 
 /**

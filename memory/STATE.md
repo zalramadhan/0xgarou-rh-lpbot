@@ -197,11 +197,17 @@ These are the rules that are easy to break by accident.
 26. **The indexer is skipped only for a quote token's own listing.** A token
     that trades *against* a quote has a small listing, and it is the only way
     to find a pool the standard probes cannot guess.
-27. **The home screen is instant.** The menu draws the last view of every
+27. **A chosen width is the width that was chosen.** A one-sided range reaches
+    the requested distance from the **live price** — "▼ -50%" is 50% below it,
+    not a third of the way down. The near bound sits on a tick boundary, so it
+    is as close to the price as the tick spacing allows (a pool with 1000-tick
+    spacing cannot do better than 10.5% a step), and the far end is rounded to
+    the grid the same way.
+28. **The home screen is instant.** The menu draws the last view of every
     position, which the monitor produces on every tick. A stale view is
     refreshed in the background, a cold one is waited for; either way the menu
     never holds the user up for the chain.
-28. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+29. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 

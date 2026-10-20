@@ -6,6 +6,7 @@ import {
   priceToTick,
   sqrtRatioX96AtTick,
   tickRangeFromPercent,
+  tickToPrice,
 } from '../src/core/math/tickMath.js';
 import { rangeKeyboard, sideKeyboard } from '../src/bot/ui.js';
 import type { TokenInfo } from '../src/core/tokens.js';
@@ -87,6 +88,36 @@ describe('one-sided ranges', () => {
     expect(() => above(0)).toThrow();
     expect(() => above(100)).toThrow();
     expect(() => above(150)).toThrow();
+  });
+
+  it('measures the far end from the live price, not from the aligned near end', () => {
+    // A pool whose tick spacing is 1000 ticks — 10.5% a step. The live price
+    // sits between two boundaries, so anchoring the width to the aligned near
+    // end shrinks the range: a 50% range came out as a 33% one.
+    const wide = 1000;
+    const price = 663;
+
+    const below = oneSidedTicks(price, 50, false, DEC0, DEC1, wide);
+    const farBelow = tickToPrice(below.tickLower, DEC0, DEC1);
+    // At least 50% below the live price, and never more than one step off.
+    expect(farBelow / price).toBeLessThanOrEqual(0.5);
+    expect(farBelow / price).toBeGreaterThan(0.5 / 1.0001 ** wide);
+
+    const above = oneSidedTicks(price, 50, true, DEC0, DEC1, wide);
+    const farAbove = tickToPrice(above.tickUpper, DEC0, DEC1);
+    // At least 50% above the live price, and never more than one step off.
+    expect(farAbove / price).toBeGreaterThanOrEqual(1.5);
+    expect(farAbove / price).toBeLessThan(1.5 * 1.0001 ** wide);
+  });
+
+  it('keeps the range on the grid for every preset width', () => {
+    for (const pct of [15, 30, 50, 85]) {
+      for (const range of [above(pct), below(pct)]) {
+        expect(range.tickLower % SPACING).toBe(0);
+        expect(range.tickUpper % SPACING).toBe(0);
+        expect(range.tickUpper).toBeGreaterThan(range.tickLower);
+      }
+    }
   });
 
   it('full range brackets the live tick', () => {

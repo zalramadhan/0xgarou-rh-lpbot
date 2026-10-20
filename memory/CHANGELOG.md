@@ -5,6 +5,37 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — A chosen range width is the width you chose
+
+**Area:** core (tick maths), tests
+
+**What changed**
+- **"▼ -50%" gave a 33% range.** The one-sided range was built by adding the
+  width to the *aligned* near bound. The width itself was computed as a ratio
+  (`log(1 + pct)`), which is right for "50% higher" but wrong for "50% lower":
+  a -50% range has to reach down to *half* the price, and the old maths only
+  reached a third of the way down. On top of that, the near bound sits on a
+  tick boundary, so with a wide tick spacing (IGNITION's pool: 1000 ticks =
+  10.5% a step) the error grew to 17 points.
+- **The far end is now the requested distance from the live price**, and the
+  near end stays as close to the price as the tick spacing allows. The
+  requested width is what the user gets: -50% is 50% below the live price (the
+  label may show a little more, because the far bound has to sit on a tick
+  boundary too).
+- The two-sided range (`±pct%`) was already right and is unchanged.
+
+**Files**
+- `src/core/math/tickMath.ts` — `oneSidedTicks`.
+- `tests/entry.test.ts` — the far end is measured from the live price.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 380/380 pass (33 files)
+- Live: the position that was opened with "▼ -50%" and ended up labelled
+  "-33% to -1%" now measures "-53% to -5%".
+
+---
+
 ## 2026-10-20 — The home screen shows the open positions
 
 **Area:** core, bot (menu, ui, positions flow), monitor, tests
