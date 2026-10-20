@@ -1,0 +1,38 @@
+{
+  "name": "robinhood-lp-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Telegram bot to open, close and monitor Uniswap v3/v4 LP positions on Robinhood Chain",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "verify:chain": "tsx scripts/verify-chain.ts",
+    "inspect": "tsx scripts/inspect-position.ts",
+    "preview:text": "tsx scripts/preview-position-text.ts",
+    "card": "tsx scripts/render-pnl-card.ts",
+    "preview:card": "tsx scripts/preview-pnl-card.ts",
+    "preview:calendar": "tsx scripts/preview-calendar.ts",
+    "smoke:0x": "tsx scripts/smoke-0x-swap.ts",
+    "smoke:gmgn": "tsx scripts/smoke-gmgn.ts",
+    "simulate:actions": "tsx scripts/simulate-actions.ts",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "dotenv": "^17.2.3",
+    "grammy": "^1.38.3",
+    "tsx": "^4.20.6",
+    "viem": "^2.38.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

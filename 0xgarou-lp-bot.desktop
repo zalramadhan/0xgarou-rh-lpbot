@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=0xgarou LP Bot
+Comment=Bot Telegram pemantau posisi LP di Robinhood Chain
+Exec="/home/zal/Documents/Bot/robinhood-lp-bot/start.sh"
+Path=/home/zal/Documents/Bot/robinhood-lp-bot
+Icon=/home/zal/Documents/Bot/robinhood-lp-bot/assets/icon.svg
+Terminal=true
+Categories=Utility;Finance;
+StartupNotify=false

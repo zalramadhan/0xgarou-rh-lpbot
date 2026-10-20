@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- 0xgarou LP bot: the range bar, the bot's signature visual. -->
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#FBFAF6" stroke="#E5E2D8" stroke-width="4"/>
+
+  <!-- the live price, right at the edge of the range -->
+  <circle cx="70" cy="46" r="8" fill="#222222"/>
+
+  <!-- the range: in range on the left, out of range on the right -->
+  <rect x="20" y="66" width="88" height="26" rx="8" fill="#F3F0E6"/>
+  <path d="M28 66 h42 v26 h-42 a8 8 0 0 1 -8 -8 v-10 a8 8 0 0 1 8 -8 z" fill="#2E7D32"/>
+  <line x1="70" y1="60" x2="70" y2="98" stroke="#222222" stroke-width="5" stroke-linecap="round"/>
+</svg>
