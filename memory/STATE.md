@@ -185,7 +185,18 @@ These are the rules that are easy to break by accident.
     `$684,45K` — everywhere it is shown (`fmtMcapUsd`). It is a large, precise
     number, so it gets the same treatment as the rupiah amounts. The other
     dollar amounts keep the plain dot format.
-25. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+25. **A position is always valued from its own pool.** The price feed is the
+    first source, but when one side of the pair has no feed, the rate of the
+    pool the position is in gives it — the market the position is exposed to,
+    for free. Without that, a position in a pool with an exotic fee tier or
+    tick spacing (IGNITION: 4.99%, spacing 1000) reads as "—" for its PnL
+    and its fees. A price that is unknown on **both** sides stays unknown: it
+    must never look like a zero, because a zero looks like a total loss and
+    would fire the stop loss.
+26. **The indexer is skipped only for a quote token's own listing.** A token
+    that trades *against* a quote has a small listing, and it is the only way
+    to find a pool the standard probes cannot guess.
+27. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 

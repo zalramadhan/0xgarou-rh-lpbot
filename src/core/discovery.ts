@@ -215,11 +215,14 @@ interface DiscoveryOutcome {
  * fee tiers, custom tick spacings, or dynamnic fees.
  */
 export async function discoverViaIndexer(tokenA: Address, tokenB: Address): Promise<DiscoveryOutcome> {
-  // The quote pairs are well known and their listing is enormous: asking the
-  // indexer for them costs three slow pages and finds nothing useful. The
-  // local probes know these pools.
-  const quote = [tokenA, tokenB].some((token) => QUOTE_TOKENS.has(token.toLowerCase()));
-  if (quote) return { pools: [], unsupported: 0 };
+  // The listing is fetched for **tokenA**. Asking the indexer for a *quote*
+  // token costs three slow pages and finds nothing useful — the local probes
+  // know those pools. A token that trades against a quote is a different
+  // case: its listing is small, and it is the only way to find a pool with an
+  // exotic fee tier (4.99%) or an exotic tick spacing (1000). Skipping it
+  // there made the price feed blind to those tokens, and a position in such a
+  // pool showed no PnL and no fees at all.
+  if (QUOTE_TOKENS.has(tokenA.toLowerCase())) return { pools: [], unsupported: 0 };
 
   const listed = await fetchIndexerPools(tokenA);
   const candidates = listed

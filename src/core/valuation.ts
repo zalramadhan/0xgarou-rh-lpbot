@@ -21,12 +21,41 @@ export interface Valuation {
   distanceToUpperPct: number;
 }
 
+/**
+ * The price of the side that has no feed, taken from the pool of the position.
+ *
+ * `snapshot.price` is token1 per token0, so one token0 is worth `price` token1.
+ * When one side has no price feed, the other side's price and that rate give
+ * it. The pool *is* the market the position is exposed to, so the number is
+ * the right one — not a guess.
+ *
+ * This is what keeps a position readable when the price feed is blind: a token
+ * whose only pool has an exotic fee tier or tick spacing is not found by the
+ * standard probes, and the position would show nothing at all.
+ */
+function priceFromPoolRate(
+  snapshot: PositionSnapshot,
+  price0Usd: number,
+  price1Usd: number,
+): { price0Usd: number; price1Usd: number } {
+  const rate = snapshot.price;
+  if (!Number.isFinite(rate) || rate <= 0) return { price0Usd, price1Usd };
+  if (!Number.isFinite(price0Usd) && Number.isFinite(price1Usd)) {
+    return { price0Usd: rate * price1Usd, price1Usd };
+  }
+  if (!Number.isFinite(price1Usd) && Number.isFinite(price0Usd)) {
+    return { price0Usd, price1Usd: price0Usd / rate };
+  }
+  return { price0Usd, price1Usd };
+}
+
 /** Values a position in USDG and measures how far price is from its bounds. */
 export async function valuate(snapshot: PositionSnapshot): Promise<Valuation> {
-  const [price0Usd, price1Usd] = await Promise.all([
+  const [feed0Usd, feed1Usd] = await Promise.all([
     usdPrice(snapshot.token0.address),
     usdPrice(snapshot.token1.address),
   ]);
+  const { price0Usd, price1Usd } = priceFromPoolRate(snapshot, feed0Usd, feed1Usd);
   const amount0Human = Number(snapshot.amount0) / 10 ** snapshot.token0.decimals;
   const amount1Human = Number(snapshot.amount1) / 10 ** snapshot.token1.decimals;
   const fees0Human = Number(snapshot.fees0) / 10 ** snapshot.token0.decimals;

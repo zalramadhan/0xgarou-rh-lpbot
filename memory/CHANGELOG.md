@@ -5,6 +5,49 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-20 — A position in an exotic pool shows its PnL and fees again
+
+**Area:** core (valuation, discovery), tests
+
+**What changed**
+- **Position #6 (IGNITION/USDG) showed no PnL and no fees.** Two things
+  together made the bot blind to that token:
+  - The price feed looks for a token's pools by probing the standard fee tiers
+    and tick spacings. IGNITION's pool is **4.99% with a spacing of 1000** —
+    neither is standard — so the probe found nothing.
+  - The indexer, which does list that pool, was skipped for every pair that
+    contains a quote token. The skip was meant for the *quote* token's own
+    (enormous) listing, not for a token that trades against a quote, so it
+    hid exactly the pools the probe cannot guess.
+  - The result was a price of NaN, and with it the whole valuation: the
+    position read `— · PnL — · Fees —`.
+- **The indexer is consulted again for a token that trades against a quote.**
+  The skip now applies to the token being *listed* only when that token is
+  itself a quote (USDG, WETH), where the listing really is enormous. The
+  price feed now finds the exotic pools (IGNITION: 6 pools, including the
+  4.99% one the position is in).
+- **A position is valued from its own pool when the feed is missing.** The
+  pool a position is in knows the rate between its two tokens, so the missing
+  side of the price is taken from there — the market the position is actually
+  exposed to, not a guess, and for free (no extra request). This is the
+  safety net: a position stays readable even when the indexer is down.
+- The market cap line comes back with it (`MC $712,81K → $1,06M · now
+  $1,03M`), because it needs the same prices.
+
+**Files**
+- `src/core/discovery.ts` — the indexer skip now only applies to a quote
+  token.
+- `src/core/valuation.ts` — `priceFromPoolRate`.
+- `tests/priceFallback.test.ts` — **new** — the fallback, the "unknown stays
+  unknown" rule and the preference for the price feed.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 374/374 pass (32 files)
+- Live: position #6 reads `💰 $53.27 · Fees $0.3383` and `📊 +$0.2701 (+0.51%)`.
+
+---
+
 ## 2026-10-20 — The project goes to GitHub
 
 **Area:** repo, docs
