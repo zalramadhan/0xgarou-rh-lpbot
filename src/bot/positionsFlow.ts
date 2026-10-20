@@ -24,6 +24,7 @@ import { readPosition, type PositionSnapshot, type PositionVersion } from '../co
 import { marketCapUsd as fetchMarketCap } from '../core/scanner.js';
 import { rebalancePosition } from '../core/strategy.js';
 import { summarizePnl, valuate, type PnlSummary, type Valuation } from '../core/valuation.js';
+import { loadView, type PositionView } from '../core/positionViews.js';
 import { store, type TrackedPosition } from '../store/store.js';
 import { esc, fmtAmount, fmtCompactUsd, fmtPct, fmtSignedUsd, fmtUsd } from '../utils/format.js';
 import { showLoading } from './screens.js';
@@ -42,30 +43,7 @@ import {
 } from './ui.js';
 import { txLock } from './locks.js';
 
-interface PositionView {
-  snapshot: PositionSnapshot;
-  valuation: Valuation;
-  pnl: PnlSummary;
-  /** FDV of the traded token, NaN when the indexer has none. */
-  marketCapUsd: number;
-}
 
-async function loadView(tracked: TrackedPosition, withMarketCap = false): Promise<PositionView | undefined> {
-  const snapshot = await readPosition(tracked.version, BigInt(tracked.tokenId));
-  if (!snapshot) return undefined;
-  const valuation = await valuate(snapshot);
-  const pnl = summarizePnl(valuation, {
-    basisUsd: tracked.basisUsd,
-    feesWithdrawnUsd: tracked.feesWithdrawnUsd,
-    compoundedFeesUsd: tracked.compoundedFeesUsd,
-    openedAt: tracked.entry.openedAt,
-  });
-  // The market cap only shows on the detail card, so the list stays fast.
-  const marketCap = withMarketCap
-    ? await fetchMarketCap(tradedToken(snapshot)).catch(() => Number.NaN)
-    : Number.NaN;
-  return { snapshot, valuation, pnl, marketCapUsd: marketCap };
-}
 
 /**
  * The button of a position in the list: its number, a colour for the state

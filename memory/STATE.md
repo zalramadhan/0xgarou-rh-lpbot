@@ -46,6 +46,7 @@ from `DB_PATH`, the keystore from `KEYSTORE_PATH`; both default to `data/`.
 | `src/bot/newFlow.ts` | The `/new` flow: token → pools → side → strategy → range → size → preview → mint. |
 | `src/bot/session.ts` | Per-chat conversation state (`Draft`, `Session` union). |
 | `src/bot/ui.ts` | All keyboards and screen text (settings, menus, previews). |
+| `src/core/positionViews.ts` | The view of a position (snapshot, valuation, PnL, market cap), its cache and the refresh behind the home screen. |
 | `src/bot/positionsFlow.ts` | Per-position actions: close, TP/SL, compound, rebalance, history. |
 | `src/bot/detectFlow.ts` | `/detect` — finds wallet LP NFTs and adopts them. |
 | `src/core/planner.ts` | `planByUsd`, `planBySideShare`, `planByWalletShare`. |
@@ -196,7 +197,11 @@ These are the rules that are easy to break by accident.
 26. **The indexer is skipped only for a quote token's own listing.** A token
     that trades *against* a quote has a small listing, and it is the only way
     to find a pool the standard probes cannot guess.
-27. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+27. **The home screen is instant.** The menu draws the last view of every
+    position, which the monitor produces on every tick. A stale view is
+    refreshed in the background, a cold one is waited for; either way the menu
+    never holds the user up for the chain.
+28. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 

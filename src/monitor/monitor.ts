@@ -15,6 +15,7 @@ import { notify } from '../bot/notify.js';
 import { positionNumber, tradedToken } from '../bot/ui.js';
 import { tradedRange } from '../core/pairs.js';
 import { marketCapUsd as fetchMarketCap } from '../core/scanner.js';
+import { setLastView } from '../core/positionViews.js';
 import { usdIdrRate } from '../core/fx.js';
 import { txLock } from '../bot/locks.js';
 
@@ -73,6 +74,18 @@ async function checkPosition(tracked: TrackedPosition): Promise<void> {
   const stateChanged = wasInRange !== snapshot.inRange;
   if (stateChanged) await store.update(tracked.id, { lastInRange: snapshot.inRange });
 
+  // The home screen shows the open positions. It draws them from the last
+  // view, so the view this tick produces is kept — the menu is then instant
+  // and shows the same numbers the monitor works with.
+  const pnl = summarizePnl(valuation, {
+    basisUsd: tracked.basisUsd,
+    feesWithdrawnUsd: tracked.feesWithdrawnUsd,
+    compoundedFeesUsd: tracked.compoundedFeesUsd,
+    openedAt: tracked.entry.openedAt,
+  });
+  const marketCap = await fetchMarketCap(tradedToken(snapshot)).catch(() => Number.NaN);
+  setLastView(tracked.id, { snapshot, valuation, pnl, marketCapUsd: marketCap, at: Date.now() });
+
   // Record the price path for the PnL card.
   const samples = nextPriceSamples(tracked, snapshot.price);
   if (samples) {
@@ -86,18 +99,9 @@ async function checkPosition(tracked: TrackedPosition): Promise<void> {
   const enteredIn = snapshot.inRange && wasInRange === false;
 
   if ((enteredOut || enteredIn) && tracked.alerts && settings.alertsEnabled) {
-    // The market cap is only needed for the alert, so it is fetched here
-    // instead of on every tick.
-    const marketCap = await fetchMarketCap(tradedToken(snapshot)).catch(() => Number.NaN);
+    const idrRate = await usdIdrRate().catch(() => Number.NaN);
     // The alert shows the PnL under the range, so the position is summarized
     // here as well.
-    const pnl = summarizePnl(valuation, {
-      basisUsd: tracked.basisUsd,
-      feesWithdrawnUsd: tracked.feesWithdrawnUsd,
-      compoundedFeesUsd: tracked.compoundedFeesUsd,
-      openedAt: tracked.entry.openedAt,
-    });
-    const idrRate = await usdIdrRate().catch(() => Number.NaN);
     const alert = { tracked, snapshot, valuation, marketCapUsd: marketCap, pnl, idrRate };
     if (enteredIn) {
       await notify(tracked.chatId, backInRangeNotification(alert), alertKeyboard(tracked.id));
@@ -117,12 +121,6 @@ async function checkPosition(tracked: TrackedPosition): Promise<void> {
     tracked.autoTakeProfit ||
     tracked.oorTakeProfit;
   if (armed && canTrade && owner) {
-    const pnl = summarizePnl(valuation, {
-      basisUsd: tracked.basisUsd,
-      feesWithdrawnUsd: tracked.feesWithdrawnUsd,
-      compoundedFeesUsd: tracked.compoundedFeesUsd,
-      openedAt: tracked.entry.openedAt,
-    });
     // "Above the range" means the traded token's price is above the upper
     // bound — the position then holds only the token. The pool price is
     // inverted for a pool that stores the traded token as token1.

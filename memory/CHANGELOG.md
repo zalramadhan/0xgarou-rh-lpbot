@@ -5,6 +5,45 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-20 — The home screen shows the open positions
+
+**Area:** core, bot (menu, ui, positions flow), monitor, tests
+
+**What changed**
+- **The main menu lists the open positions**, in the same format as the
+  position list: the token with the colour of its state, the visual range,
+  the market cap and the PnL with the fees.
+  ```
+  🟢 <b>#6 · IGNITION/USDG</b> · Robinhood
+  [■■■■■■■■■|□] 92% Left
+  MC $713,02K → $1,06M · now $1,04M
+  $53.32 · PnL +0.61% · Fees $0.3723
+  ```
+  Every open position also gets a button at the top of the menu
+  (`#6 🟢 IGNITION/USDG · $53`), so it can be opened from the home screen.
+- **The menu never waits for the chain.** The last view of every position is
+  cached (`core/positionViews.ts`): the monitor produces a view on every tick
+  and keeps it, and the menu draws the cache. A view that has gone stale is
+  refreshed in the background; only a cold cache is waited for, because
+  otherwise the menu would have nothing to show. One read per position at a
+  time, so two taps never send two rounds of requests.
+- The view loader moved from the bot to `core/positionViews.ts`, so the
+  monitor and the bot share one way of reading a position.
+
+**Files**
+- `src/core/positionViews.ts` — **new** — the view, the cache and the refresh.
+- `src/bot/menu.ts` — the position block and the position buttons.
+- `src/bot/ui.ts` — `menuPositionRow`.
+- `src/bot/positionsFlow.ts` — the loader moved out.
+- `src/monitor/monitor.ts` — keeps the cache warm.
+- `tests/menuPositions.test.ts` — **new**.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 378/378 pass (33 files)
+
+---
+
 ## 2026-10-20 — A position in an exotic pool shows its PnL and fees again
 
 **Area:** core (valuation, discovery), tests

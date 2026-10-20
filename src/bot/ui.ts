@@ -351,6 +351,27 @@ export function positionRow(
   ].join('\n');
 }
 
+/**
+ * The position block on the home screen.
+ *
+ * The same rows as the position list, with the market cap in between:
+ *
+ *   🟢 #6 · IGNITION/USDG · Robinhood
+ *   [■■■■■■■■■|□] 91% Left
+ *   MC $712,81K → $1,06M · now $1,03M
+ *   $53.27 · PnL +0.51% · Fees $0.3383
+ */
+export function menuPositionRow(
+  tracked: TrackedPosition,
+  view: { snapshot: PositionSnapshot; valuation: Valuation; pnl: PnlSummary },
+  marketCapUsd: number,
+): string {
+  const lines = positionRow(tracked, view.snapshot, view.valuation, view.pnl).split('\n');
+  const mcap = marketCapLine(view.snapshot, view.valuation, marketCapUsd);
+  if (mcap) lines.splice(2, 0, mcap);
+  return lines.join('\n');
+}
+
 export function positionKeyboard(
   id: string,
   tracked: TrackedPosition,
