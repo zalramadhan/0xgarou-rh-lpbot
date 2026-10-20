@@ -20,7 +20,7 @@ one-tap rebalance.
 | Open | Pool discovery across v3 fee tiers and v4 pool keys (a scan takes ~2.5 s cold and is instant while the caches are warm), a range ladder of 15–85% (15, 20, 25, 30, 35, 45, 50, 55, 60, 65, 70, 75, 80, 85) or a custom price range, USD size or wallet-share sizing, an exact mint preview in market cap, slippage-protected min amounts |
 | Bid Ask | One-sided ladder with 4–10 entries: the selected range is split into contiguous bins, capital is allocated 1:2:…:N (nearest entry smallest, farthest largest), and each entry is minted and tracked as its own NFT. Spot remains the one-position option |
 | Close | A confirmation with the value, the fees, the PnL and the slippage a swap would use → the position is closed → you choose 🔄 Swap Token to USDG or 💎 Keep Both → and, for a swap, the route: 0x API or V3 Pool. A failed swap is reported as a failure, never as a success |
-| Monitor | Value, pending fees, exact PnL against cost basis, fee APR, distance to each range bound |
+| Monitor | Value, pending fees, exact PnL against cost basis, fee APR, distance to each range bound. The **home screen** shows the open positions: token, state colour, visual range, market cap, PnL and fees — drawn from a cache, so the menu is instant |
 | Speed | Every button answers its callback query **before** it does any work, a screen that takes a moment shows a `⏳` note, and the market cap is cached and refreshed in the background — one tap is always enough |
 | Alerts | 🟢 back-in-range / 🔴 out-of-range DMs with action buttons (🔄 Refresh, 🤖 Check LP Agent, 📈 View Chart on GMGN). A master switch for both lives in the **main menu** (🔕 Range alerts off) and in **⚙️ Settings** |
 | Automate | Auto-compound fees on an interval, TP/SL, ⚡ auto-TP with re-entry cycles, 📈 OOR take profit — each toggleable per position. **The rebalance is manual**: 🔁 Rebalance now closes the position and re-mints it with the same width and the same side, on the live price |
@@ -101,13 +101,28 @@ what `/start` and `/menu` open:
 Uniswap v3 + v4 · Robinhood Chain (4663)
 ────────────
 🧪 Mode: DRY-RUN — nothing is sent
+🔔 Range alerts: on — out of range and back in range
 👛 Wallet: 0xa2CA…c8EB
-📊 Open positions: 0
+📊 Open positions: 1
 🎯 Armed exit rules: 0
-📜 Closed: 0
+📜 Closed: 2 · net PnL -$0.00
+────────────
+🟢 #6 · IGNITION/USDG · Robinhood
+[■■■■■■■■■|□] 92% Left
+MC $713,02K → $1,06M · now $1,04M
+$53.32 · PnL +0.61% · Fees $0.3723
 ────────────
 👇 Pick an action:
 ```
+
+**The open positions are on the home screen**: the token with the colour of its
+state (🟢 profit, 🔴 loss, 🟠 out of range), the visual range, the market cap
+and the PnL with the fees. Each one is a button as well, so it can be opened
+from there.
+
+The menu never waits for the chain. The monitor reads the positions anyway, so
+it keeps the last view of each one and the menu draws that; a view that has
+gone stale is refreshed in the background.
 
 `[🚀 Open position]` · `[📊 Positions] [💼 Portfolio]` · `[🔍 Detect] [📜 History]` ·
 `[👛 Wallet] [⚙️ Settings]` · `[📒 Address book] [📡 Status] [ℹ️ Help]` — every sub-screen
@@ -565,8 +580,9 @@ delete your messages** — delete the key and passphrase messages yourself.
 - **Pool price** comes from `slot0.sqrtPriceX96` (v3) / `StateView.getSlot0(poolId)` (v4), adjusted for token decimals.
 - **Position amounts** use the exact Uniswap `LiquidityAmounts` formulas on `BigInt`.
 - **Uncollected fees** use `feeGrowthInside` (v3 pool ticks, v4 `StateView.getFeeGrowthInside`) minus the position's last checkpoint, plus `tokensOwed` on v3.
-- **USD value** prices each token in USDG. USDG is the chain's anchor stablecoin, so it is the USD unit. Direct token/USDG pools are preferred; otherwise the bot routes through WETH. No price feed → shows `—`, never a guess.
+- **USD value** prices each token in USDG. USDG is the chain's anchor stablecoin, so it is the USD unit. Direct token/USDG pools are preferred; otherwise the bot routes through WETH. A token whose only pool has an exotic fee tier or tick spacing (4.99% / spacing 1000) is found through the pool indexer, and a position is additionally priced from **its own pool** when no feed has it — the pool is the market that position is exposed to. No price at all → shows `—`, never a guess.
 - **PnL** is exact against a cost basis: `principal + pending fees + fees withdrawn - capital deposited`. Compounded fees increase both the basis and the position, so PnL stays continuous and nothing is double counted. **APR** annualizes fee income (pending + withdrawn + compounded) on that basis.
+- **Market caps** are written with two decimals and a comma — `$713,02K`, `$1,06M` — because a market cap is a large, precise number. The other dollar amounts keep the plain `$53.32` form.
 - Tick ↔ price conversion uses double precision (relative error ~1e-15). Minting always uses integer ticks aligned to the pool's tick spacing, so prices are only used for sizing and display.
 
 ## Verified deployments (checked on-chain, chainId 4663)
