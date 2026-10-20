@@ -39,13 +39,13 @@ const tracked = {
 } as unknown as TrackedPosition;
 
 console.log('===== /pos 1 =====');
-console.log(positionCard(tracked, snapshot, valuation, pnl, { idrRate: 16_000, autoTpTargetPct: 1.5, marketCapUsd: 1_300_000 }));
+console.log(positionCard(tracked, snapshot, valuation, pnl, { idrRate: 16_000, autoTpTargetPct: 1.5, marketCap: { fdvUsd: 1_300_000, priceUsd: 0.00167 } }));
 console.log('\n===== /positions =====');
 console.log(positionRow(tracked, snapshot, valuation, pnl));
 console.log('\n===== OOR =====');
-console.log(outOfRangeNotification({ tracked, snapshot: { ...snapshot, inRange: false, tick: -3000 }, valuation, marketCapUsd: 1_300_000 }));
+console.log(outOfRangeNotification({ tracked, snapshot: { ...snapshot, inRange: false, tick: -3000 }, valuation, marketCap: { fdvUsd: 1_300_000, priceUsd: 0.00167 } }));
 console.log('\n===== back in range =====');
-console.log(backInRangeNotification({ tracked, snapshot, valuation, marketCapUsd: 1_300_000 }));
+console.log(backInRangeNotification({ tracked, snapshot, valuation, marketCap: { fdvUsd: 1_300_000, priceUsd: 0.00167 } }));
 console.log('\n===== exit (take profit + re-entry) =====');
 console.log(exitNotification({
   kind: 'takeProfit', tracked, snapshot, valuation, pnl,

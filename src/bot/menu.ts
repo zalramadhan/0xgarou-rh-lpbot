@@ -52,7 +52,7 @@ export function menuText(chatId: number, views?: Map<string, PositionView>): str
       const view = views?.get(tracked.id);
       lines.push(
         view
-          ? menuPositionRow(tracked, view, view.marketCapUsd)
+          ? menuPositionRow(tracked, view, view.marketCap)
           : `⚪ <b>${positionNumber(tracked.id)}</b> — the position is being read…`,
       );
     }

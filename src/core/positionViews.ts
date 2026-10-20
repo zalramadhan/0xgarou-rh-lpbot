@@ -1,5 +1,5 @@
 import { readPosition, type PositionSnapshot } from './positions.js';
-import { marketCapUsd as fetchMarketCap } from './scanner.js';
+import { marketCapInfo as fetchMarketCap, UNKNOWN_MARKET_CAP, type MarketCap } from './scanner.js';
 import { summarizePnl, valuate, type PnlSummary, type Valuation } from './valuation.js';
 import { tradedToken } from './pairs.js';
 import type { TrackedPosition } from '../store/store.js';
@@ -11,8 +11,8 @@ export interface PositionView {
   snapshot: PositionSnapshot;
   valuation: Valuation;
   pnl: PnlSummary;
-  /** FDV of the traded token, NaN when the indexer has none. */
-  marketCapUsd: number;
+  /** The market cap of the traded token, as the indexer reports it. */
+  marketCap: MarketCap;
   /** When the view was read. */
   at: number;
 }
@@ -38,9 +38,9 @@ export async function loadView(
   });
   // The market cap only shows on the detail card, so the list stays fast.
   const marketCap = withMarketCap
-    ? await fetchMarketCap(tradedToken(snapshot)).catch(() => Number.NaN)
-    : Number.NaN;
-  return { snapshot, valuation, pnl, marketCapUsd: marketCap, at: Date.now() };
+    ? await fetchMarketCap(tradedToken(snapshot)).catch(() => UNKNOWN_MARKET_CAP)
+    : UNKNOWN_MARKET_CAP;
+  return { snapshot, valuation, pnl, marketCap, at: Date.now() };
 }
 
 /* ------------------------------ the cache -------------------------------- */

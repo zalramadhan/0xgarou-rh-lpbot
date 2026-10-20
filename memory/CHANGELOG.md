@@ -5,6 +5,47 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The market cap of a range bound stops drifting
+
+**Area:** core (scanner, pairs), bot (ui, flows), monitor (alerts), tests
+
+**What changed**
+- **The market cap under the range used to change while the range did not.**
+  The line was `FDV × (bound price / live price)`, and the two halves came
+  from different moments: the FDV is the indexer's snapshot, the price is the
+  chain's. A position opened with "▼ -50%" read `$540,58K → $1,09M` and a
+  few minutes later `$497,44K → $1,00M`, for the very same two ticks.
+- **The market cap is now built from the supply.** The indexer sends an FDV
+  together with the price it used, and every pool of a token reports the same
+  supply (IGNITION: 999,993,568) — so the FDV divided by that price is the
+  supply, and the market cap of a price is `supply × price`. A bound now keeps
+  its market cap for as long as the supply does not change, and the "now" is
+  the live price times the supply.
+  ```
+  MC $517,13K → $1,04M · now $993,65K
+  ```
+  The bounds are the numbers the Uniswap interface shows as prices (the
+  supply happens to be one billion, so they read the same).
+- **The price line is gone again.** The bot speaks in market cap: the range is
+  measured against the market cap, the bar is drawn from the market cap, and
+  the alerts are about the market cap. One unit, everywhere.
+
+**Files**
+- `src/core/scanner.ts` — `MarketCap` (FDV + the price it was taken at),
+  `tokenSupply`, `marketCapInfo`, `UNKNOWN_MARKET_CAP`.
+- `src/bot/ui.ts` — `marketCapLine` and `plannedMarketCapLine` use the supply.
+- `src/core/positionViews.ts`, `src/bot/positionsFlow.ts`, `src/bot/newFlow.ts`,
+  `src/monitor/monitor.ts`, `src/monitor/notifyText.ts` — the market cap info
+  travels as a pair instead of a number.
+- `src/core/pairs.ts` — `quoteToken` (the quote's price is in USDG).
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 381/381 pass (33 files)
+- Live: the bounds stay at `$517,13K → $1,04M` while the price moves 5%.
+
+---
+
 ## 2026-10-21 — The price range is shown next to the market cap range
 
 **Area:** core (pairs), bot (ui, new flow), monitor (alerts), tests

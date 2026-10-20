@@ -15,10 +15,10 @@ vi.mock('../src/core/positions.js', async (importOriginal) => {
   return { ...actual, readPosition };
 });
 
-const marketCapUsd = vi.fn();
+const marketCapInfo = vi.fn();
 vi.mock('../src/core/scanner.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/core/scanner.js')>();
-  return { ...actual, marketCapUsd };
+  return { ...actual, marketCapInfo };
 });
 
 const { showMenu, menuText, menuKeyboard } = await import('../src/bot/menu.js');
@@ -83,7 +83,7 @@ let trackedId = '';
 
 beforeEach(async () => {
   readPosition.mockResolvedValue(snapshot);
-  marketCapUsd.mockResolvedValue(1_014_525);
+  marketCapInfo.mockResolvedValue({ fdvUsd: 1_014_525, priceUsd: 0.0010959249666466393 });
   const tracked = await store.add({
     chatId: CHAT_ID,
     version: 'v4',
@@ -131,8 +131,6 @@ describe('the open positions on the home screen', () => {
     expect(text).toMatch(/\[[■□|]+\]/);
     // The market cap, with the two decimals and the comma.
     expect(text).toMatch(/MC \$[\d,]+,\d{2}[MK]? → \$[\d,]+,\d{2}[MK]? · now \$[\d,]+,\d{2}[MK]?/);
-    // The price range as well, so it can be compared with the Uniswap screen.
-    expect(text).toContain('💲');
     // The PnL and the fees.
     expect(text).toContain('PnL');
     expect(text).toContain('Fees');
@@ -156,7 +154,7 @@ describe('the open positions on the home screen', () => {
         totalPnlPct: 0.34,
         aprPct: 155,
       },
-      marketCapUsd: 1_014_525,
+      marketCap: { fdvUsd: 1_014_525, priceUsd: 0.0010959249666466393 },
       at: Date.now(),
     });
     const buttons = menuKeyboard(store.settingsFor(CHAT_ID), store.positionsFor(CHAT_ID), views)
@@ -182,7 +180,7 @@ describe('the open positions on the home screen', () => {
         totalPnlPct: 0.34,
         aprPct: 155,
       },
-      marketCapUsd: 1_014_525,
+      marketCap: { fdvUsd: 1_014_525, priceUsd: 0.0010959249666466393 },
       at: Date.now(),
     };
     setLastView(trackedId, view);

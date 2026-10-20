@@ -26,7 +26,12 @@ import {
   type BidAskPlan,
 } from '../core/bidAsk.js';
 import { formatRangeLabel } from '../card/data.js';
-import { marketCapUsd as fetchMarketCap } from '../core/scanner.js';
+import {
+  marketCapInfo as fetchMarketCap,
+  tokenSupply,
+  UNKNOWN_MARKET_CAP,
+  type MarketCap,
+} from '../core/scanner.js';
 import { openPosition, type OpenPositionResult } from '../core/actions.js';
 import { safetyIcon, safetyText, screenToken, type SafetyReport } from '../core/safety.js';
 import { store } from '../store/store.js';
@@ -249,28 +254,36 @@ function pairLabel(pool: Pool, token: TokenInfo): string {
 }
 
 /**
- * The market cap of the pasted token, or NaN when the indexer has none.
+ * The market cap of the pasted token, as the indexer reports it.
  */
-async function plannedMarketCap(pool: Pool, token: TokenInfo): Promise<number> {
-  return fetchMarketCap(token).catch(() => Number.NaN);
+async function plannedMarketCap(pool: Pool, token: TokenInfo): Promise<MarketCap> {
+  return fetchMarketCap(token).catch(() => UNKNOWN_MARKET_CAP);
+}
+
+/**
+ * The quote's price in USDG — the unit every number of the bot is in.
+ */
+async function quoteUsd(pool: Pool, token: TokenInfo): Promise<number> {
+  return usdPrice(quoteOf(pool, token).address).catch(() => Number.NaN);
 }
 
 /**
  * The market cap the token would have at a given display price.
  *
- * The market cap follows the token's price, so a bound is the market cap
- * scaled by the price the token would have there.
+ * The market cap of a price is the supply times that price, so a bound keeps
+ * the same market cap as long as the supply does not change.
  */
 function marketCapAt(
-  marketCapNow: number,
+  marketCap: MarketCap,
   pool: Pool,
   token: TokenInfo,
   bound: number,
+  quoteUsd: number,
 ): number {
-  if (!Number.isFinite(marketCapNow) || marketCapNow <= 0) return Number.NaN;
-  const now = displayPrice(pool, token);
-  if (!Number.isFinite(now) || now <= 0) return Number.NaN;
-  return marketCapNow * (bound / now);
+  const supply = tokenSupply(marketCap);
+  if (!Number.isFinite(supply) || supply <= 0) return Number.NaN;
+  if (!Number.isFinite(quoteUsd) || quoteUsd <= 0) return Number.NaN;
+  return supply * bound * quoteUsd;
 }
 
 /**
@@ -283,7 +296,8 @@ async function plannedMarketCapLine(
   upper: number,
 ): Promise<string | undefined> {
   const marketCap = await plannedMarketCap(pool, token);
-  return plannedMarketCapLineOf(marketCap, pool, token, lower, upper);
+  const quote = await quoteUsd(pool, token);
+  return plannedMarketCapLineOf(marketCap, pool, token, lower, upper, quote);
 }
 
 function safetyLines(safety: SafetyReport | undefined): string[] {
@@ -369,6 +383,7 @@ async function sendBidAskPreview(
   // The outer range is shown in market cap, like the spot review.
   const outerMcap = await plannedMarketCapLine(pool, token, outer.lower, outer.upper);
   const mcapNow = await plannedMarketCap(pool, token);
+  const mcapQuoteUsd = await quoteUsd(pool, token);
   const visual = plannedRangeVisual(pool, token, plan.tickLower, plan.tickUpper);
 
   const lines = [
@@ -385,8 +400,8 @@ async function sendBidAskPreview(
     '────────────',
     ...plan.entries.map((entry) => {
       const bin = displayBounds(pool, token, entry.tickLower, entry.tickUpper);
-      const binLow = marketCapAt(mcapNow, pool, token, bin.lower);
-      const binHigh = marketCapAt(mcapNow, pool, token, bin.upper);
+      const binLow = marketCapAt(mcapNow, pool, token, bin.lower, mcapQuoteUsd);
+      const binHigh = marketCapAt(mcapNow, pool, token, bin.upper, mcapQuoteUsd);
       // The bins are shown in market cap as well, so the whole review is read
       // in one unit.
       const range =
@@ -925,7 +940,7 @@ async function cardContext(
   contract: string;
 }> {
   const traded = tradedToken(pool);
-  const mcap = knownMcap ?? (await fetchMarketCap(traded).catch(() => Number.NaN));
+  const mcap = knownMcap ?? (await fetchMarketCap(traded).catch(() => UNKNOWN_MARKET_CAP)).fdvUsd;
   return {
     entryMcapUsd: Number.isFinite(mcap) ? mcap : undefined,
     rangeLabel: formatRangeLabel(
@@ -1152,7 +1167,9 @@ async function executeBidAskOpen(
   const opened: BidAskOpened[] = [];
   let failure: string | undefined;
   // The market cap is the same for every entry, so it is fetched once.
-  const bidAskMcap = await fetchMarketCap(tradedToken(draft.pool)).catch(() => Number.NaN);
+  const bidAskMcap = await fetchMarketCap(tradedToken(draft.pool))
+    .then((info) => info.fdvUsd)
+    .catch(() => Number.NaN);
 
   try {
     await txLock.run(`chat:${chatId}`, async () => {

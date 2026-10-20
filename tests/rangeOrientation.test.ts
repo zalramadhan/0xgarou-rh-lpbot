@@ -66,7 +66,15 @@ describe('the range of a position that is not open yet', () => {
 
   it('shows the market cap at the bounds, not the price', () => {
     // The display prices of the bounds: the token's own price in USDG.
-    const line = plannedMarketCapLine(3_560_302, invertedPool, TOKEN, 1 / 414.59, 1 / 264.36);
+    // The indexer's snapshot: the FDV and the price it used for it.
+    const line = plannedMarketCapLine(
+      { fdvUsd: 3_560_302, priceUsd: 1 / 260.32 },
+      invertedPool,
+      TOKEN,
+      1 / 414.59,
+      1 / 264.36,
+      1,
+    );
     expect(line).toBeDefined();
     expect(line).toContain('now $3,56M');
     expect(line).not.toContain('per V4');

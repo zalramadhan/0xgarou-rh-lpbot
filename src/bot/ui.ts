@@ -25,6 +25,7 @@ import { fmtIdr } from '../core/fx.js';
 import { config } from '../config.js';
 import { chartTokenAddress, gmgnTokenLink, lpAgentPortfolioLink } from './links.js';
 import { quoteToken, rangeForToken, tokenPrice, tradedRange } from '../core/pairs.js';
+import { tokenSupply, UNKNOWN_MARKET_CAP, type MarketCap } from '../core/scanner.js';
 import { tickToPrice } from '../core/math/tickMath.js';
 
 export function txLink(hash: string): string {
@@ -36,6 +37,7 @@ function addressLink(address: string): string {
 }
 
 const USDG_ADDRESS = TOKENS.USDG.toLowerCase();
+
 
 /** Cells in the range bar, the marker aside. */
 const RANGE_BAR_CELLS = 10;
@@ -182,49 +184,48 @@ export function plannedRangeVisual(
 }
 
 /**
- * The price range of a position, in quote per traded token.
- *
- *   💲 0.000517 → 0.001041 · now 0.001089 USDG
- *
- * This is the same range the market cap line shows, quoted per token instead
- * of per supply — the numbers the Uniswap interface puts on the screen, so
- * the two can be compared directly.
- */
-export function priceRangeLine(
-  snapshot: PositionSnapshot,
-  valuation: Valuation,
-): string | undefined {
-  const traded = tradedRange(snapshot, snapshot.price, valuation.lowerPrice, valuation.upperPrice);
-  if (!Number.isFinite(traded.current) || traded.current <= 0) return undefined;
-  const first = Math.min(traded.lower, traded.upper);
-  const second = Math.max(traded.lower, traded.upper);
-  if (!Number.isFinite(first) || !Number.isFinite(second) || first <= 0) return undefined;
-  const quote = quoteToken(snapshot);
-  return `💲 ${fmtPrice(first)} → ${fmtPrice(second)} · now ${fmtPrice(traded.current)} ${esc(quote.symbol)}`;
-}
-
-/**
  * "MC $1.12M → $1.40M · now $1.30M" — the market cap at the range bounds and
  * right now. Omitted entirely when no market cap is available.
+ *
+ * The market cap of a price is the supply times that price, so a bound keeps
+ * the same market cap for as long as the supply does not change. The
+ * indexer's FDV is a snapshot taken at *its* price, so dividing it by that
+ * price gives the supply — and the supply is what makes the numbers steady.
+ * Scaling a stale FDV by the live price instead would make the bounds drift
+ * every time the price moved.
  */
 export function marketCapLine(
   snapshot: PositionSnapshot,
   valuation: Valuation,
-  marketCapUsd: number,
+  marketCap: MarketCap,
 ): string | undefined {
-  if (!Number.isFinite(marketCapUsd) || marketCapUsd <= 0) return undefined;
+  const supply = tokenSupply(marketCap);
+  if (!Number.isFinite(supply) || supply <= 0) return undefined;
+  const quoteUsd = quoteUsdPrice(snapshot, valuation);
+  if (!Number.isFinite(quoteUsd) || quoteUsd <= 0) return undefined;
   const traded = tradedRange(snapshot, snapshot.price, valuation.lowerPrice, valuation.upperPrice);
   if (!Number.isFinite(traded.current) || traded.current <= 0) return undefined;
 
-  // The market cap follows the traded token's price, so the bounds are scaled
-  // by the price the token would have at that bound.
-  const atLower = marketCapUsd * (traded.lower / traded.current);
-  const atUpper = marketCapUsd * (traded.upper / traded.current);
-  if (!Number.isFinite(atLower) || !Number.isFinite(atUpper)) return undefined;
+  const atLower = supply * Math.min(traded.lower, traded.upper) * quoteUsd;
+  const atUpper = supply * Math.max(traded.lower, traded.upper) * quoteUsd;
+  const now = supply * traded.current * quoteUsd;
+  if (!Number.isFinite(atLower) || !Number.isFinite(atUpper) || !Number.isFinite(now)) {
+    return undefined;
+  }
+  return `MC ${fmtMcapUsd(atLower)} → ${fmtMcapUsd(atUpper)} · now ${fmtMcapUsd(now)}`;
+}
 
-  const first = Math.min(atLower, atUpper);
-  const second = Math.max(atLower, atUpper);
-  return `MC ${fmtMcapUsd(first)} → ${fmtMcapUsd(second)} · now ${fmtMcapUsd(marketCapUsd)}`;
+/**
+ * The quote's price in USDG — the unit every number of the bot is in.
+ *
+ * USDG is the chain's dollar, so its price is 1. A pool against WETH is
+ * priced through the WETH/USDG pool.
+ */
+function quoteUsdPrice(snapshot: PositionSnapshot, valuation: Valuation): number {
+  const quote = quoteToken(snapshot);
+  return quote.address.toLowerCase() === snapshot.token0.address.toLowerCase()
+    ? valuation.price0Usd
+    : valuation.price1Usd;
 }
 
 /**
@@ -234,21 +235,25 @@ export function marketCapLine(
  * ratio is the one the position card uses.
  */
 export function plannedMarketCapLine(
-  marketCapNow: number,
+  marketCap: MarketCap,
   pool: { price: number; token0: TokenInfo; token1: TokenInfo },
   token: TokenInfo,
   lower: number,
   upper: number,
+  quoteUsd: number,
 ): string | undefined {
-  if (!Number.isFinite(marketCapNow) || marketCapNow <= 0) return undefined;
+  const supply = tokenSupply(marketCap);
+  if (!Number.isFinite(supply) || supply <= 0) return undefined;
+  if (!Number.isFinite(quoteUsd) || quoteUsd <= 0) return undefined;
   const now = tokenPrice(pool, token, pool.price);
   if (!Number.isFinite(now) || now <= 0) return undefined;
-  const atLower = marketCapNow * (lower / now);
-  const atUpper = marketCapNow * (upper / now);
-  if (!Number.isFinite(atLower) || !Number.isFinite(atUpper)) return undefined;
-  const first = Math.min(atLower, atUpper);
-  const second = Math.max(atLower, atUpper);
-  return `MC ${fmtMcapUsd(first)} → ${fmtMcapUsd(second)} · now ${fmtMcapUsd(marketCapNow)}`;
+  const atLower = supply * Math.min(lower, upper) * quoteUsd;
+  const atUpper = supply * Math.max(lower, upper) * quoteUsd;
+  const nowMcap = supply * now * quoteUsd;
+  if (!Number.isFinite(atLower) || !Number.isFinite(atUpper) || !Number.isFinite(nowMcap)) {
+    return undefined;
+  }
+  return `MC ${fmtMcapUsd(atLower)} → ${fmtMcapUsd(atUpper)} · now ${fmtMcapUsd(nowMcap)}`;
 }
 
 /** "🎯 TP +30% · SL -20%", or undefined when no exit rule is armed. */
@@ -295,7 +300,7 @@ export function positionCard(
   snapshot: PositionSnapshot,
   valuation: Valuation,
   pnl: PnlSummary,
-  options: { idrRate?: number; autoTpTargetPct?: number; marketCapUsd?: number; cycleLimit?: number } = {},
+  options: { idrRate?: number; autoTpTargetPct?: number; marketCap?: MarketCap; cycleLimit?: number } = {},
 ): string {
   const visual = rangeVisual(valuation, snapshot);
   const pair = positionPair(snapshot);
@@ -310,11 +315,8 @@ export function positionCard(
     `${visual.bar} <b>${visual.label}</b>`,
   ];
 
-  const marketCap = marketCapLine(snapshot, valuation, options.marketCapUsd ?? Number.NaN);
+  const marketCap = marketCapLine(snapshot, valuation, options.marketCap ?? UNKNOWN_MARKET_CAP);
   if (marketCap) lines.push(marketCap);
-  // The same range in price, so it can be compared with the Uniswap screen.
-  const priceRange = priceRangeLine(snapshot, valuation);
-  if (priceRange) lines.push(priceRange);
   lines.push(RANGE_FRAME);
 
   const pnlLine = `📊 ${fmtSignedUsd(pnl.totalPnlUsd)} (${fmtPct(pnl.totalPnlPct)})`;
@@ -389,13 +391,11 @@ export function positionRow(
 export function menuPositionRow(
   tracked: TrackedPosition,
   view: { snapshot: PositionSnapshot; valuation: Valuation; pnl: PnlSummary },
-  marketCapUsd: number,
+  marketCap: MarketCap,
 ): string {
   const lines = positionRow(tracked, view.snapshot, view.valuation, view.pnl).split('\n');
-  const mcap = marketCapLine(view.snapshot, view.valuation, marketCapUsd);
-  const priceRange = priceRangeLine(view.snapshot, view.valuation);
+  const mcap = marketCapLine(view.snapshot, view.valuation, marketCap);
   if (mcap) lines.splice(2, 0, mcap);
-  if (priceRange) lines.splice(mcap ? 3 : 2, 0, priceRange);
   return lines.join('\n');
 }
 

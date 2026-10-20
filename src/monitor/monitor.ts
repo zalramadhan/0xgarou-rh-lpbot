@@ -14,7 +14,7 @@ import { mapLimit } from '../utils/async.js';
 import { notify } from '../bot/notify.js';
 import { positionNumber, tradedToken } from '../bot/ui.js';
 import { tradedRange } from '../core/pairs.js';
-import { marketCapUsd as fetchMarketCap } from '../core/scanner.js';
+import { marketCapInfo as fetchMarketCap, UNKNOWN_MARKET_CAP } from '../core/scanner.js';
 import { setLastView } from '../core/positionViews.js';
 import { usdIdrRate } from '../core/fx.js';
 import { txLock } from '../bot/locks.js';
@@ -83,8 +83,8 @@ async function checkPosition(tracked: TrackedPosition): Promise<void> {
     compoundedFeesUsd: tracked.compoundedFeesUsd,
     openedAt: tracked.entry.openedAt,
   });
-  const marketCap = await fetchMarketCap(tradedToken(snapshot)).catch(() => Number.NaN);
-  setLastView(tracked.id, { snapshot, valuation, pnl, marketCapUsd: marketCap, at: Date.now() });
+  const marketCap = await fetchMarketCap(tradedToken(snapshot)).catch(() => UNKNOWN_MARKET_CAP);
+  setLastView(tracked.id, { snapshot, valuation, pnl, marketCap, at: Date.now() });
 
   // Record the price path for the PnL card.
   const samples = nextPriceSamples(tracked, snapshot.price);
@@ -102,7 +102,7 @@ async function checkPosition(tracked: TrackedPosition): Promise<void> {
     const idrRate = await usdIdrRate().catch(() => Number.NaN);
     // The alert shows the PnL under the range, so the position is summarized
     // here as well.
-    const alert = { tracked, snapshot, valuation, marketCapUsd: marketCap, pnl, idrRate };
+    const alert = { tracked, snapshot, valuation, marketCap, pnl, idrRate };
     if (enteredIn) {
       await notify(tracked.chatId, backInRangeNotification(alert), alertKeyboard(tracked.id));
     } else {

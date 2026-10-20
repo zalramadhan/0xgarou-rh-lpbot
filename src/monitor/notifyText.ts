@@ -9,18 +9,18 @@ import {
   marketCapLine,
   positionNumber,
   positionPair,
-  priceRangeLine,
   RANGE_FRAME,
   rangeVisual,
 } from '../bot/ui.js';
 import { EXIT_LABEL, type ExitKind } from './exits.js';
+import type { MarketCap } from '../core/scanner.js';
 
 interface RangeAlertInput {
   tracked: TrackedPosition;
   snapshot: PositionSnapshot;
   valuation: Valuation;
-  /** FDV of the traded token, NaN when the indexer has none. */
-  marketCapUsd: number;
+  /** The market cap of the traded token, as the indexer reports it. */
+  marketCap: MarketCap;
   /** The position's PnL, so the alert can show it under the range. */
   pnl?: PnlSummary;
   /** USD → IDR rate, when the chat shows money in IDR. */
@@ -49,10 +49,8 @@ export function outOfRangeNotification(input: RangeAlertInput): string {
     `${visual.bar} ${visual.label}`,
   ];
 
-  const marketCap = marketCapLine(snapshot, valuation, input.marketCapUsd);
+  const marketCap = marketCapLine(snapshot, valuation, input.marketCap);
   if (marketCap) lines.push(`🏦 ${marketCap}`);
-  const priceRange = priceRangeLine(snapshot, valuation);
-  if (priceRange) lines.push(priceRange);
   lines.push(RANGE_FRAME);
 
   if (input.pnl) {
@@ -93,10 +91,8 @@ export function backInRangeNotification(input: RangeAlertInput): string {
     `${visual.bar} ${visual.label}`,
   ];
 
-  const marketCap = marketCapLine(snapshot, valuation, input.marketCapUsd);
+  const marketCap = marketCapLine(snapshot, valuation, input.marketCap);
   if (marketCap) lines.push(`🏦 ${marketCap}`);
-  const priceRange = priceRangeLine(snapshot, valuation);
-  if (priceRange) lines.push(priceRange);
   lines.push(RANGE_FRAME);
   lines.push(`📐 ${visual.distancePct.toFixed(2)}% from the nearest bound`);
 

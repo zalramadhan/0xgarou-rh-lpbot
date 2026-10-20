@@ -79,7 +79,9 @@ const tracked: TrackedPosition = {
   createdAt: Date.now() - 7_200_000,
 };
 
-const alert = { tracked, snapshot, valuation, marketCapUsd: 1_300_000 };
+// The indexer's snapshot: the FDV and the price it used for it. The price is
+// the live one, so the supply comes out at 778.4M tokens.
+const alert = { tracked, snapshot, valuation, marketCap: { fdvUsd: 1_300_000, priceUsd: 0.00167 } };
 
 describe('out of range notification', () => {
   it('shows the side, the bar and the distance to the nearest bound', () => {
@@ -92,7 +94,7 @@ describe('out of range notification', () => {
     expect(text).toContain('←[|□□□□□□□□□□] OOR LEFT');
     // The market cap at the bounds follows the price: it is below the range
     // now, so the token has to grow to reach the bounds again.
-    expect(text).toContain('🏦 MC $1,44M → $2,89M · now $1,30M');
+    expect(text).toContain('🏦 MC $778,44K → $1,56M · now $700,60K');
     expect(text).toContain('below the lower bound');
     expect(text).toContain('🔄 Rebalance is manual');
   });
@@ -104,24 +106,12 @@ describe('out of range notification', () => {
 
     const lines = text.split('\n');
     const mcap = lines.findIndex((line) => line.includes('MC '));
-    const price = lines.findIndex((line) => line.includes('💲'));
     const pnlLine = lines.findIndex((line) => line.includes('📊'));
     expect(mcap).toBeGreaterThan(-1);
-    // The price range follows the market cap, so the two can be compared with
-    // the Uniswap screen.
-    expect(price).toBe(mcap + 1);
     // The range block is framed, and the PnL follows it right away.
-    expect(lines[price + 1]).toBe('─────────────────────────────');
-    expect(pnlLine).toBe(price + 2);
+    expect(lines[mcap + 1]).toBe('─────────────────────────────');
+    expect(pnlLine).toBe(mcap + 2);
     expect(text).toContain('📊 +$21.00 (+40.00%)');
-  });
-
-  it('shows the price range under the market cap', () => {
-    const text = outOfRangeNotification(
-      { ...alert, pnl, snapshot: { ...snapshot, inRange: false, tick: -3000, price: 0.0009 } },
-    );
-    // The same range as Uniswap shows: quote per traded token.
-    expect(text).toContain('💲 0.001000 → 0.002000 · now 0.000900 USDG');
   });
 
   it('uses OOR RIGHT above the upper bound', () => {
@@ -151,10 +141,26 @@ describe('out of range notification', () => {
 
   it('omits the market cap line when there is none', () => {
     const text = outOfRangeNotification(
-      { ...alert, marketCapUsd: Number.NaN, snapshot: { ...snapshot, inRange: false, tick: -3000, price: 0.0009 } },
+      { ...alert, marketCap: { fdvUsd: Number.NaN, priceUsd: Number.NaN }, snapshot: { ...snapshot, inRange: false, tick: -3000, price: 0.0009 } },
     );
     expect(text).not.toContain('MC ');
     expect(text).not.toContain('NaN');
+  });
+
+  it('keeps the market cap of the bounds when the price moves', () => {
+    // The market cap of a fixed price is the supply times that price, so a
+    // bound must not change while the price moves under it.
+    const before = outOfRangeNotification({
+      ...alert,
+      snapshot: { ...snapshot, inRange: false, tick: -3000, price: 0.0009 },
+    });
+    const after = outOfRangeNotification({
+      ...alert,
+      snapshot: { ...snapshot, inRange: false, tick: -3000, price: 0.0021 },
+    });
+    const bounds = (text: string) => text.match(/MC \$[\d,]+[KM]? → \$[\d,]+[KM]?/)?.[0];
+    expect(bounds(before)).toBeDefined();
+    expect(bounds(after)).toBe(bounds(before));
   });
 
   it('says that the rebalance is manual', () => {

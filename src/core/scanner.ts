@@ -259,14 +259,14 @@ async function runScan(token: TokenInfo): Promise<TokenScan> {
 
   scanned.sort((a, b) => b.tvlUsd - a.tvlUsd);
 
-  const marketCapUsd = marketCapOf(listed, token);
+  const marketCap = marketCapOf(listed, token);
   return {
     token,
     pools: scanned,
     listed: uniswapPools.length,
     totalTvlUsd,
-    marketCapUsd,
-    tvlToMcap: marketCapUsd > 0 ? totalTvlUsd / marketCapUsd : Number.NaN,
+    marketCapUsd: marketCap.fdvUsd,
+    tvlToMcap: marketCap.fdvUsd > 0 ? totalTvlUsd / marketCap.fdvUsd : Number.NaN,
     referencePriceUsd,
   };
 }
@@ -279,33 +279,64 @@ async function quoteAddresses(token: TokenInfo): Promise<Address[]> {
 }
 
 /**
+ * The market cap of a token, as the indexer reports it.
+ *
+ * The indexer sends an FDV together with the price it used for it. Both come
+ * from the same snapshot, so the two can be divided into the token's supply —
+ * which is what makes the market cap of a *fixed* price a fixed number.
+ */
+export interface MarketCap {
+  /** The FDV the indexer reports, in USD. */
+  fdvUsd: number;
+  /** The price the indexer used for that FDV, in USD per token. */
+  priceUsd: number;
+}
+
+/** The market cap of a token the indexer knows nothing about. */
+export const UNKNOWN_MARKET_CAP: MarketCap = { fdvUsd: Number.NaN, priceUsd: Number.NaN };
+
+/**
+ * The token's total supply, from the indexer's own numbers.
+ *
+ * Every pool of a token reports the same supply, so the number does not depend
+ * on which pool the FDV came from.
+ */
+export function tokenSupply(mcap: MarketCap): number {
+  if (!Number.isFinite(mcap.fdvUsd) || mcap.fdvUsd <= 0) return Number.NaN;
+  if (!Number.isFinite(mcap.priceUsd) || mcap.priceUsd <= 0) return Number.NaN;
+  return mcap.fdvUsd / mcap.priceUsd;
+}
+
+/**
  * FDV for the scanned token. The listing reports it per pool as the FDV of the
  * base token, so take the deepest pool where our token is the base side.
  */
-function marketCapOf(listed: IndexerPool[], token: TokenInfo): number {
+function marketCapOf(listed: IndexerPool[], token: TokenInfo): MarketCap {
   const sorted = [...listed]
     .filter((entry) => isSame(entry.baseToken, token.address))
     .sort((a, b) => b.reserveUsd - a.reserveUsd);
   for (const entry of sorted) {
-    if (Number.isFinite(entry.baseFdvUsd) && entry.baseFdvUsd > 0) return entry.baseFdvUsd;
+    if (Number.isFinite(entry.baseFdvUsd) && entry.baseFdvUsd > 0) {
+      return { fdvUsd: entry.baseFdvUsd, priceUsd: entry.basePriceUsd };
+    }
   }
-  return Number.NaN;
+  return { fdvUsd: Number.NaN, priceUsd: Number.NaN };
 }
 
 /** The market cap of a token, cached for a minute. */
-const marketCapCache = new Map<string, { ts: number; value: number }>();
+const marketCapCache = new Map<string, { ts: number; value: MarketCap }>();
 const MARKET_CAP_TTL_MS = 60_000;
 
 /**
- * FDV of a single token, using the same listing and the same calculation as
- * the pool scan. NaN when the indexer has no FDV for it.
+ * The market cap of a single token, using the same listing and the same
+ * calculation as the pool scan. NaN when the indexer has no FDV for it.
  *
  * The FDV is a property of the token, not of the pool, so the first page that
  * has one is enough: the deep pool of a launchpad token can sit on page three
  * and paging for it would cost seconds on every screen. The value is cached
  * and refreshed in the background, so a screen is never held up by it.
  */
-export async function marketCapUsd(token: TokenInfo): Promise<number> {
+export async function marketCapInfo(token: TokenInfo): Promise<MarketCap> {
   const key = token.address.toLowerCase();
   const hit = marketCapCache.get(key);
   if (hit) {
@@ -316,8 +347,13 @@ export async function marketCapUsd(token: TokenInfo): Promise<number> {
   return refreshMarketCap(key, token);
 }
 
+/** The FDV of a token, as the indexer reports it. */
+export async function marketCapUsd(token: TokenInfo): Promise<number> {
+  return (await marketCapInfo(token)).fdvUsd;
+}
+
 /** Fetches the FDV and keeps it for a minute. */
-async function refreshMarketCap(key: string, token: TokenInfo): Promise<number> {
+async function refreshMarketCap(key: string, token: TokenInfo): Promise<MarketCap> {
   const listed = await fetchIndexerPools(token.address, { maxPages: 1 });
   const value = marketCapOf(listed, token);
   marketCapCache.set(key, { ts: Date.now(), value });

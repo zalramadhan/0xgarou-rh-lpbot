@@ -119,14 +119,16 @@ describe('position rendering', () => {
   it('omits the market cap line when there is no market cap', () => {
     const text = positionCard(tracked, snapshot, valuation, pnl);
     expect(text).not.toContain('MC ');
-    expect(positionCard(tracked, snapshot, valuation, pnl, { marketCapUsd: 1_300_000 })).toContain(
-      'now $1,30M',
-    );
+    expect(
+      positionCard(tracked, snapshot, valuation, pnl, {
+        marketCap: { fdvUsd: 1_300_000, priceUsd: 0.00167 },
+      }),
+    ).toContain('now $1,30M');
   });
 
   it('scales the market cap with the range bounds', () => {
     // The traded token is token0 here, so the market cap follows the price.
-    const line = marketCapLine(snapshot, valuation, 1_300_000);
+    const line = marketCapLine(snapshot, valuation, { fdvUsd: 1_300_000, priceUsd: 0.00167 });
     expect(line).toBe('MC $778,44K → $1,56M · now $1,30M');
   });
 

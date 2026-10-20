@@ -203,11 +203,12 @@ These are the rules that are easy to break by accident.
     is as close to the price as the tick spacing allows (a pool with 1000-tick
     spacing cannot do better than 10.5% a step), and the far end is rounded to
     the grid the same way.
-28. **A range is shown in two units.** The market cap line (per supply) and the
-    price line (per token) describe the same two bounds; the price is the
-    number the Uniswap interface shows, so the two can be compared directly.
-    The quote of the pair is named, so a price is never shown as dollars when
-    it is not.
+28. **A range is shown in market cap only.** The market cap of a price is the
+    supply times that price, so a bound keeps its market cap for as long as
+    the supply does not change. The market cap line is built from the supply
+    (the indexer's FDV divided by the price it used for it), never by scaling a
+    stale FDV with the live price — that made the bounds drift every time the
+    price moved. The "now" is the live price times the supply.
 29. **The home screen is instant.** The menu draws the last view of every
     position, which the monitor produces on every tick. A stale view is
     refreshed in the background, a cold one is waited for; either way the menu

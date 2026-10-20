@@ -21,7 +21,7 @@ import { exitNotificationLines } from '../monitor/notifyText.js';
 import { usdIdrRate } from '../core/fx.js';
 import { parseCycleLimit } from './parsers.js';
 import { readPosition, type PositionSnapshot, type PositionVersion } from '../core/positions.js';
-import { marketCapUsd as fetchMarketCap } from '../core/scanner.js';
+import { marketCapInfo as fetchMarketCap, UNKNOWN_MARKET_CAP, type MarketCap } from '../core/scanner.js';
 import { rebalancePosition } from '../core/strategy.js';
 import { summarizePnl, valuate, type PnlSummary, type Valuation } from '../core/valuation.js';
 import { loadView, type PositionView } from '../core/positionViews.js';
@@ -135,7 +135,7 @@ export async function positionScreen(
   const text = positionCard(tracked, view.snapshot, view.valuation, view.pnl, {
     idrRate,
     autoTpTargetPct: settings.autoTpTargetPct,
-    marketCapUsd: view.marketCapUsd,
+    marketCap: view.marketCap,
     cycleLimit: settings.tpCycleLimit,
   });
   const keyboard = positionKeyboard(
@@ -181,7 +181,7 @@ export async function showPosition(ctx: Context, id: string, edit = false): Prom
   const text = positionCard(tracked, view.snapshot, view.valuation, view.pnl, {
     idrRate,
     autoTpTargetPct: settings.autoTpTargetPct,
-    marketCapUsd: view.marketCapUsd,
+    marketCap: view.marketCap,
     cycleLimit: settings.tpCycleLimit,
   });
   const kb = positionKeyboard(
@@ -377,8 +377,8 @@ async function showCloseConfirmation(ctx: Context, tracked: TrackedPosition): Pr
       })
     : undefined;
   const marketCap = snapshot
-    ? await fetchMarketCap(tradedToken(snapshot)).catch(() => Number.NaN)
-    : Number.NaN;
+    ? await fetchMarketCap(tradedToken(snapshot)).catch(() => UNKNOWN_MARKET_CAP)
+    : UNKNOWN_MARKET_CAP;
 
   const lines = [
     `🔒 <b>Close ${esc(snapshot ? positionPair(snapshot) : tracked.id)}?</b>`,
