@@ -9,6 +9,7 @@ import {
   marketCapLine,
   positionNumber,
   positionPair,
+  priceRangeLine,
   RANGE_FRAME,
   rangeVisual,
 } from '../bot/ui.js';
@@ -50,6 +51,8 @@ export function outOfRangeNotification(input: RangeAlertInput): string {
 
   const marketCap = marketCapLine(snapshot, valuation, input.marketCapUsd);
   if (marketCap) lines.push(`🏦 ${marketCap}`);
+  const priceRange = priceRangeLine(snapshot, valuation);
+  if (priceRange) lines.push(priceRange);
   lines.push(RANGE_FRAME);
 
   if (input.pnl) {
@@ -92,6 +95,8 @@ export function backInRangeNotification(input: RangeAlertInput): string {
 
   const marketCap = marketCapLine(snapshot, valuation, input.marketCapUsd);
   if (marketCap) lines.push(`🏦 ${marketCap}`);
+  const priceRange = priceRangeLine(snapshot, valuation);
+  if (priceRange) lines.push(priceRange);
   lines.push(RANGE_FRAME);
   lines.push(`📐 ${visual.distancePct.toFixed(2)}% from the nearest bound`);
 

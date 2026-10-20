@@ -131,6 +131,8 @@ describe('the open positions on the home screen', () => {
     expect(text).toMatch(/\[[■□|]+\]/);
     // The market cap, with the two decimals and the comma.
     expect(text).toMatch(/MC \$[\d,]+,\d{2}[MK]? → \$[\d,]+,\d{2}[MK]? · now \$[\d,]+,\d{2}[MK]?/);
+    // The price range as well, so it can be compared with the Uniswap screen.
+    expect(text).toContain('💲');
     // The PnL and the fees.
     expect(text).toContain('PnL');
     expect(text).toContain('Fees');

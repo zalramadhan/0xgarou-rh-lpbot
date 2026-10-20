@@ -28,6 +28,17 @@ export function positionPair(pair: TokenPair): string {
 }
 
 /**
+ * The quote of a pair: the side the traded token is priced in.
+ *
+ * A pool without USDG has no stable quote, so the other token is used — the
+ * price is then shown in that token, never in dollars.
+ */
+export function quoteToken(pair: TokenPair): TokenInfo {
+  const traded = tradedToken(pair);
+  return traded.address.toLowerCase() === pair.token0.address.toLowerCase() ? pair.token1 : pair.token0;
+}
+
+/**
  * Which way a one-sided range has to sit for the funded token.
  *
  * A position holds `token0` when the price is at or below its lower bound and

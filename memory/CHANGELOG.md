@@ -5,6 +5,37 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The price range is shown next to the market cap range
+
+**Area:** core (pairs), bot (ui, new flow), monitor (alerts), tests
+
+**What changed**
+- **The price range is now printed under the market cap range**, in every
+  screen that shows the range: the position card, the home screen, the
+  out-of-range and back-in-range alerts, and the review screen before a mint.
+  ```
+  MC $497,44K → $1,00M · now $1,13M
+  💲 0.000517 → 0.001041 · now 0.001172 USDG
+  ```
+  The market cap is the range per supply, the price is the range per token —
+  and the price is the number the Uniswap interface shows, so the two can be
+  compared directly instead of having to work out which is which.
+- The quote of the pair is named (`USDG`, or `WETH` for a pool without a
+  stable quote), so a price is never presented as dollars when it is not.
+
+**Files**
+- `src/core/pairs.ts` — `quoteToken`.
+- `src/bot/ui.ts` — `priceRangeLine`, used by the card and the menu row.
+- `src/monitor/notifyText.ts` — both alerts.
+- `src/bot/newFlow.ts` — the review screen.
+- `tests/notifyText.test.ts`, `tests/menuPositions.test.ts`.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 381/381 pass (33 files)
+
+---
+
 ## 2026-10-21 — A chosen range width is the width you chose
 
 **Area:** core (tick maths), tests

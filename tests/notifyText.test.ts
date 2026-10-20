@@ -104,12 +104,24 @@ describe('out of range notification', () => {
 
     const lines = text.split('\n');
     const mcap = lines.findIndex((line) => line.includes('MC '));
+    const price = lines.findIndex((line) => line.includes('💲'));
     const pnlLine = lines.findIndex((line) => line.includes('📊'));
     expect(mcap).toBeGreaterThan(-1);
+    // The price range follows the market cap, so the two can be compared with
+    // the Uniswap screen.
+    expect(price).toBe(mcap + 1);
     // The range block is framed, and the PnL follows it right away.
-    expect(lines[mcap + 1]).toBe('─────────────────────────────');
-    expect(pnlLine).toBe(mcap + 2);
+    expect(lines[price + 1]).toBe('─────────────────────────────');
+    expect(pnlLine).toBe(price + 2);
     expect(text).toContain('📊 +$21.00 (+40.00%)');
+  });
+
+  it('shows the price range under the market cap', () => {
+    const text = outOfRangeNotification(
+      { ...alert, pnl, snapshot: { ...snapshot, inRange: false, tick: -3000, price: 0.0009 } },
+    );
+    // The same range as Uniswap shows: quote per traded token.
+    expect(text).toContain('💲 0.001000 → 0.002000 · now 0.000900 USDG');
   });
 
   it('uses OOR RIGHT above the upper bound', () => {

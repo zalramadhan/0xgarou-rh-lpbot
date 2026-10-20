@@ -24,7 +24,7 @@ import {
 import { fmtIdr } from '../core/fx.js';
 import { config } from '../config.js';
 import { chartTokenAddress, gmgnTokenLink, lpAgentPortfolioLink } from './links.js';
-import { rangeForToken, tokenPrice, tradedRange } from '../core/pairs.js';
+import { quoteToken, rangeForToken, tokenPrice, tradedRange } from '../core/pairs.js';
 import { tickToPrice } from '../core/math/tickMath.js';
 
 export function txLink(hash: string): string {
@@ -182,6 +182,28 @@ export function plannedRangeVisual(
 }
 
 /**
+ * The price range of a position, in quote per traded token.
+ *
+ *   💲 0.000517 → 0.001041 · now 0.001089 USDG
+ *
+ * This is the same range the market cap line shows, quoted per token instead
+ * of per supply — the numbers the Uniswap interface puts on the screen, so
+ * the two can be compared directly.
+ */
+export function priceRangeLine(
+  snapshot: PositionSnapshot,
+  valuation: Valuation,
+): string | undefined {
+  const traded = tradedRange(snapshot, snapshot.price, valuation.lowerPrice, valuation.upperPrice);
+  if (!Number.isFinite(traded.current) || traded.current <= 0) return undefined;
+  const first = Math.min(traded.lower, traded.upper);
+  const second = Math.max(traded.lower, traded.upper);
+  if (!Number.isFinite(first) || !Number.isFinite(second) || first <= 0) return undefined;
+  const quote = quoteToken(snapshot);
+  return `💲 ${fmtPrice(first)} → ${fmtPrice(second)} · now ${fmtPrice(traded.current)} ${esc(quote.symbol)}`;
+}
+
+/**
  * "MC $1.12M → $1.40M · now $1.30M" — the market cap at the range bounds and
  * right now. Omitted entirely when no market cap is available.
  */
@@ -290,6 +312,9 @@ export function positionCard(
 
   const marketCap = marketCapLine(snapshot, valuation, options.marketCapUsd ?? Number.NaN);
   if (marketCap) lines.push(marketCap);
+  // The same range in price, so it can be compared with the Uniswap screen.
+  const priceRange = priceRangeLine(snapshot, valuation);
+  if (priceRange) lines.push(priceRange);
   lines.push(RANGE_FRAME);
 
   const pnlLine = `📊 ${fmtSignedUsd(pnl.totalPnlUsd)} (${fmtPct(pnl.totalPnlPct)})`;
@@ -368,7 +393,9 @@ export function menuPositionRow(
 ): string {
   const lines = positionRow(tracked, view.snapshot, view.valuation, view.pnl).split('\n');
   const mcap = marketCapLine(view.snapshot, view.valuation, marketCapUsd);
+  const priceRange = priceRangeLine(view.snapshot, view.valuation);
   if (mcap) lines.splice(2, 0, mcap);
+  if (priceRange) lines.splice(mcap ? 3 : 2, 0, priceRange);
   return lines.join('\n');
 }
 

@@ -326,6 +326,15 @@ async function sendPreview(
     `Total ≈ <b>${fmtUsd(plan.valueUsd)}</b> · slippage ${settings.slippagePct}%`,
   ];
 
+  // The price range as well, so it can be compared with the Uniswap screen.
+  if (marketCap) {
+    lines.splice(
+      6,
+      0,
+      `💲 <code>${fmtPrice(lower)}</code> → <code>${fmtPrice(upper)}</code> ${esc(quote.symbol)} per ${esc(token.symbol)}`,
+    );
+  }
+
   if (plan.balance0 !== undefined && plan.balance1 !== undefined) {
     lines.push(
       `Wallet ${fmtAmount(plan.balance0, pool.token0.decimals)} ${esc(pool.token0.symbol)} + ${fmtAmount(plan.balance1, pool.token1.decimals)} ${esc(pool.token1.symbol)}`,

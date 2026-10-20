@@ -203,11 +203,16 @@ These are the rules that are easy to break by accident.
     is as close to the price as the tick spacing allows (a pool with 1000-tick
     spacing cannot do better than 10.5% a step), and the far end is rounded to
     the grid the same way.
-28. **The home screen is instant.** The menu draws the last view of every
+28. **A range is shown in two units.** The market cap line (per supply) and the
+    price line (per token) describe the same two bounds; the price is the
+    number the Uniswap interface shows, so the two can be compared directly.
+    The quote of the pair is named, so a price is never shown as dollars when
+    it is not.
+29. **The home screen is instant.** The menu draws the last view of every
     position, which the monitor produces on every tick. A stale view is
     refreshed in the background, a cold one is waited for; either way the menu
     never holds the user up for the chain.
-29. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+30. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 
