@@ -1,3 +1,4 @@
+import { MIN_CALENDAR_ROW_PNL_USD } from '../constants/calendar.js';
 import { formatCompactAmount, formatDuration, NA } from './format.js';
 import {
   BACKGROUND,
@@ -114,7 +115,13 @@ export interface CalendarPayload {
   stats: CalendarStats;
   days: CalendarDay[];
   weeks: CalendarWeek[];
+  /** The positions worth a row of their own. */
   positions: CalendarPosition[];
+  /**
+   * How many positions were closed in the period, including the ones that are
+   * too small to be worth a row.
+   */
+  totalPositions: number;
 }
 
 const PADDING = 56;
@@ -440,8 +447,14 @@ function dayView(payload: CalendarPayload): string[] {
   const parts: string[] = [];
   const positions = payload.positions.slice(0, 8);
   if (positions.length === 0) {
+    // The day may have closed positions that were too small to be worth a
+    // row. Saying "nothing was closed" then would be a lie.
+    const message =
+      payload.totalPositions > 0
+        ? `Semua PnL hari ini di bawah $${MIN_CALENDAR_ROW_PNL_USD.toFixed(2)}.`
+        : 'Tidak ada posisi yang ditutup di hari ini.';
     parts.push(
-      centered('Tidak ada posisi yang ditutup di hari ini.', BODY_TOP + 120, 26, {
+      centered(message, BODY_TOP + 120, 26, {
         fill: MUTED,
         font: FONT_SANS,
       }),

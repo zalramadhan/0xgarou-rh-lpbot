@@ -46,6 +46,41 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The calendar's day view leaves out the dust
+
+**Area:** core (calendar), card (calendar), constants, tests
+
+**What changed**
+- **A close whose PnL is a fraction of a cent no longer gets a row in the
+  calendar's day view.** The dry-run closes (a PnL of `-0.000001`) were four
+  "-$0.00" rows on the 21st, and they also counted as **four losses** — the
+  day read "Win 1/6" when two of the six ever happened. Rows now need a PnL of
+  at least **$0.10** (in either direction: a real loss of −$2.50 still shows,
+  because hiding it would leave the day's net not matching the rows).
+- **The win rate counts only what is shown** — the 21st now reads
+  "Posisi 2 · Win 2/2" instead of "Posisi 6 · Win 1/6".
+- **A day that only closed dust does not claim nothing was closed.** The card
+  says *"Semua PnL hari ini di bawah $0.10."* instead of *"Tidak ada posisi
+  yang ditutup di hari ini."* — positions *were* closed, they were just not
+  worth a row.
+- **The day's net PnL is unchanged** — it is the truth and it still counts
+  every close.
+
+**Files**
+- `src/constants/calendar.ts` — **new** — the $0.10 rule.
+- `src/core/calendar.ts` — `isWorthACalendarRow`, the day view's rows and
+  stats.
+- `src/card/calendarCard.ts` — the honest empty message; the payload gained
+  `totalPositions`.
+- `tests/calendarRows.test.ts` — **new**.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 404/404 pass (37 files)
+- Live: the 21st renders two rows and "Posisi 2 · Win 2/2".
+
+---
+
 ## 2026-10-21 — The route impact limit is 2%, and it is a setting
 
 **Area:** core (swap, routeImpact), bot (settings, close flow), store, tests

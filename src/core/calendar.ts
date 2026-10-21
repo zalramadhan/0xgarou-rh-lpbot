@@ -1,4 +1,5 @@
 import { CHAINS } from '../constants/chain.js';
+import { MIN_CALENDAR_ROW_PNL_USD } from '../constants/calendar.js';
 import { store, type ClosedRecord } from '../store/store.js';
 import {
   closeReasonLabel,
@@ -147,6 +148,12 @@ export function positionPnl(record: ClosedRecord, currency: CalendarCurrency): n
   if (currency === 'USD') return record.pnlUsd;
   if (!Number.isFinite(record.idrRate) || record.idrRate <= 0) return Number.NaN;
   return record.pnlUsd * record.idrRate;
+}
+
+/** True when the position is worth a row of its own. */
+export function isWorthACalendarRow(position: CalendarPosition): boolean {
+  if (position.missing) return true;
+  return Math.abs(position.pnlUsd) >= MIN_CALENDAR_ROW_PNL_USD;
 }
 
 function toPosition(record: ClosedRecord, currency: CalendarCurrency): CalendarPosition {
@@ -308,6 +315,7 @@ export function buildCalendarPayload(request: CalendarRequest): CalendarPayload 
     days: [],
     weeks: [],
     positions: [],
+    totalPositions: 0,
   };
 
   if (view === 'month') {
@@ -412,8 +420,12 @@ export function buildCalendarPayload(request: CalendarRequest): CalendarPayload 
 
   // Day view.
   const records = index.get(period) ?? [];
-  const positions = records.map((record) => toPosition(record, currency));
-  const valued = positions.filter((position) => !position.missing);
+  const all = records.map((record) => toPosition(record, currency));
+  // A close whose PnL is a fraction of a cent is not worth a row, and it must
+  // not count as a loss either.
+  const positions = all.filter((position) => isWorthACalendarRow(position));
+  // The day's net is the truth: it counts every close, the dust included.
+  const valued = all.filter((position) => !position.missing);
   const [year, month, day] = period.split('-').map(Number);
   const date: LocalDate = { year: year ?? 1970, month: month ?? 1, day: day ?? 1, date: period, weekday: 0 };
 
@@ -423,8 +435,9 @@ export function buildCalendarPayload(request: CalendarRequest): CalendarPayload 
     positions,
     days: [],
     weeks: [],
-    hasData: positions.length > 0,
-    netPnl: valued.length === positions.length ? valued.reduce((sum, p) => sum + p.pnl, 0) : Number.NaN,
+    totalPositions: all.length,
+    hasData: all.length > 0,
+    netPnl: valued.length === all.length ? valued.reduce((sum, p) => sum + p.pnl, 0) : Number.NaN,
     netPnlUsd: valued.reduce((sum, p) => sum + p.pnlUsd, 0),
     stats: positionStats(positions),
   };
