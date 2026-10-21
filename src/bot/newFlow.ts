@@ -95,6 +95,11 @@ function oneSidedTicksFor(
 ) {
   // The funded token decides which side of the market the range has to sit on.
   const direction = oneSidedDirection(pool, want);
+  // The width belongs to the traded token's own price, so the range helper has
+  // to know which side of the pool the traded token is on: the pool price is
+  // the inverse of the token's price when the token is token1.
+  const traded = tradedToken(pool);
+  const tradedIsToken0 = traded.address.toLowerCase() === pool.token0.address.toLowerCase();
   // `pool.price` is token1 per token0 in human units, which is what the tick
   // helpers expect.
   return oneSidedTicks(
@@ -104,6 +109,7 @@ function oneSidedTicksFor(
     pool.token0.decimals,
     pool.token1.decimals,
     pool.tickSpacing,
+    tradedIsToken0,
   );
 }
 
@@ -339,15 +345,6 @@ async function sendPreview(
     `Deposit <b>${fmtAmount(plan.amount0, pool.token0.decimals)} ${esc(pool.token0.symbol)}</b> + <b>${fmtAmount(plan.amount1, pool.token1.decimals)} ${esc(pool.token1.symbol)}</b>`,
     `Total ≈ <b>${fmtUsd(plan.valueUsd)}</b> · slippage ${settings.slippagePct}%`,
   ];
-
-  // The price range as well, so it can be compared with the Uniswap screen.
-  if (marketCap) {
-    lines.splice(
-      6,
-      0,
-      `💲 <code>${fmtPrice(lower)}</code> → <code>${fmtPrice(upper)}</code> ${esc(quote.symbol)} per ${esc(token.symbol)}`,
-    );
-  }
 
   if (plan.balance0 !== undefined && plan.balance1 !== undefined) {
     lines.push(

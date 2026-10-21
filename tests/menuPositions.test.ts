@@ -9,6 +9,10 @@ import { zeroAddress } from 'viem';
  * The menu must stay instant, so it draws the last view of every position
  * instead of reading the chain on every tap.
  */
+const CHAT_ID = 777_030;
+const USDG = '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168';
+const IGNITION = '0x01E6301bc1118be90Cc6Bc2d1B5C0c44Bb883111';
+
 const readPosition = vi.fn();
 vi.mock('../src/core/positions.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/core/positions.js')>();
@@ -21,6 +25,13 @@ vi.mock('../src/core/scanner.js', async (importOriginal) => {
   return { ...actual, marketCapInfo };
 });
 
+// The price feed reads the chain and the indexer, which is slow and rate
+// limited: the menu is not what this file is about.
+vi.mock('../src/core/prices.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/core/prices.js')>();
+  return { ...actual, usdPrice: async (address: string) => (address.toLowerCase() === USDG.toLowerCase() ? 1 : 0.001) };
+});
+
 const { showMenu, menuText, menuKeyboard } = await import('../src/bot/menu.js');
 const { store } = await import('../src/store/store.js');
 const { clearSession } = await import('../src/bot/session.js');
@@ -28,9 +39,6 @@ const { setLastView, getLastView, dropLastView } = await import('../src/core/pos
 const { valuate } = await import('../src/core/valuation.js');
 type PositionSnapshot = import('../src/core/positions.js').PositionSnapshot;
 
-const CHAT_ID = 777_030;
-const USDG = '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168';
-const IGNITION = '0x01E6301bc1118be90Cc6Bc2d1B5C0c44Bb883111';
 
 const snapshot = {
   version: 'v4',

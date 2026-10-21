@@ -452,6 +452,11 @@ class Store {
     return next;
   }
 
+  /** Every closed record, newest first. */
+  allHistory(): ClosedRecord[] {
+    return this.data.history.slice().reverse();
+  }
+
   /** Closed positions for a chat, newest first. */
   historyFor(chatId: number): ClosedRecord[] {
     return this.data.history.filter((r) => r.chatId === chatId).slice().reverse();

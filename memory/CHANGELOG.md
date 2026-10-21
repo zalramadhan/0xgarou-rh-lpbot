@@ -46,6 +46,56 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The range width is the width that was asked for, and a swap no longer looks like a loss
+
+**Area:** core (tick maths, history, zeroX), bot (new flow), monitor (exits), scripts, tests
+
+**What changed**
+- **"▼ -50%" still came out as a third.** The percentage was applied to the
+  **pool** price, but the pool price is the *inverse* of the token's own price
+  when the token is token1 (RAETO/USDG stores token0 = USDG, token1 = RAETO).
+  "Pool price +50%" is therefore "the token's price −33%" — exactly what the
+  review showed (`0.001186`, a far end 33.9% away). The width now belongs to
+  the **traded token's** price, the price the user reads and the range label
+  shows; the *direction* (which side of the market the range must sit on, so
+  the deposit holds a single token) stays in the pool's terms.
+  - A -50% range on that pool now reaches 50.1% away (`0.000896`).
+- **The review screen no longer shows a price range** — the market cap only,
+  as asked. The price line was a leftover of the change before it.
+- **A close with a 0x swap was reported as a 71% loss.** The swap itself was
+  fine (8,107 IGNITION for 7.61 USDG, a 1.3% spread). Three things were wrong:
+  1. The **0x route never said what it sold**, so the whole withdrawal looked
+     unsold and the swapped tokens were valued a second time.
+  2. The **quote that stayed in the wallet** (46.48 USDG) was never counted.
+  3. The **fees the close collected** (1,457 IGNITION) were never counted
+     either — the close withdraws the position's amounts *and* its fees.
+  - The net PnL of that close now reads **+$1.81 (+3.38%)** instead of
+    −$38.33 (−71.49%).
+- **The old record was repaired** (`npm run repair:swap-pnl`): the amounts are
+  read from the close's and the swap's own transactions, so the number is
+  verifiable. The gross PnL was not touched — only the derived net figure.
+
+**Files**
+- `src/core/math/tickMath.ts` — `oneSidedTicks` measures the width in the
+  traded token's terms.
+- `src/bot/newFlow.ts` — the caller knows which side the traded token is on;
+  the price line is gone from the review.
+- `src/core/zeroXSwap.ts` — the 0x route reports what it sold.
+- `src/core/history.ts` — the accounting counts the quote that stayed.
+- `src/monitor/exits.ts` — the withdrawal is the amounts *and* the fees.
+- `scripts/repair-swap-pnl.ts` — **new** — repairs the records closed with the
+  old accounting.
+- `tests/entry.test.ts`, `tests/closeCosts.test.ts` — the width in the traded
+  token's terms, the quote and the double-counted token.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 384/384 pass (33 files)
+- Live: the -50% range on the RAETO pool reaches 50.1% away; the repaired
+  record reads +$1.81 (+3.38%).
+
+---
+
 ## 2026-10-21 — The price range is shown next to the market cap range
 
 **Area:** core (pairs), bot (ui, new flow), monitor (alerts), tests

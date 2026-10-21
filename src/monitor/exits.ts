@@ -75,6 +75,34 @@ function tokenSide(snapshot: PositionSnapshot): { token: PositionSnapshot['token
   return undefined;
 }
 
+/**
+ * What the close put in the wallet: the token the swap sells, and the quote
+ * that stays there.
+ *
+ * The close withdraws the position's amounts **and** the fees it collected, so
+ * both sides are worth counting. The quote stayed in the wallet, and the fees
+ * on the token side are part of what the position was worth. Leaving them out
+ * made a close with a swap look like a total loss: the money was in the
+ * wallet, but the PnL did not count it.
+ */
+function withdrawal(
+  snapshot: PositionSnapshot,
+  valuation: Valuation,
+): { tokenAmount: bigint; quoteUsd: number } {
+  const side = tokenSide(snapshot);
+  if (!side) return { tokenAmount: 0n, quoteUsd: Number.NaN };
+  const tokenIsToken0 = side.token.address.toLowerCase() === snapshot.token0.address.toLowerCase();
+  const tokenFees = tokenIsToken0 ? snapshot.fees0 : snapshot.fees1;
+  const quoteAmount = tokenIsToken0 ? valuation.amount1Human : valuation.amount0Human;
+  const quoteFees = tokenIsToken0 ? valuation.fees1Human : valuation.fees0Human;
+  const quotePrice = tokenIsToken0 ? valuation.price1Usd : valuation.price0Usd;
+  const quoteTotal = (quoteAmount + quoteFees) * quotePrice;
+  return {
+    tokenAmount: side.amount + tokenFees,
+    quoteUsd: Number.isFinite(quoteTotal) ? quoteTotal : Number.NaN,
+  };
+}
+
 /** Swaps the position's own token proceeds into USDG, best effort. */
 async function autoSwap(
   snapshot: PositionSnapshot,
@@ -211,11 +239,14 @@ export async function performExit(params: ExitParams): Promise<ExitResult> {
       // it as well.
       const side = tokenSide(snapshot);
       const ethPriceUsd = await usdPrice(TOKENS.WETH).catch(() => Number.NaN);
+      const taken = withdrawal(snapshot, valuation);
       const accounting = swapAccounting(swapOutcome, {
-        withdrawnAmount: side?.amount ?? 0n,
+        withdrawnAmount: taken.tokenAmount,
         decimals: side?.token.decimals ?? 18,
         ethPriceUsd,
         exitPrice: record.exitPrice,
+        // The quote that stayed in the wallet is part of the position's value.
+        quoteUsd: taken.quoteUsd,
       });
       closedRecord = (await store.updateClosed(record.id, withSwap(record, accounting))) ?? record;
     }

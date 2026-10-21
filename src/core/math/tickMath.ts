@@ -128,9 +128,14 @@ export function fullRangeTicks(spacing: number): TickRange {
  * bound, up for the lower one — or the range straddles the price and the mint
  * quietly demands both tokens.
  *
- * @param pct width of the range as a percentage of the current price
- * @param above true = range sits above the price (funded in token0),
- *              false = range sits below the price (funded in token1)
+ * @param currentPrice the pool's price (token1 per token0)
+ * @param pct width of the range as a percentage of the **traded token's** price
+ * @param above true = range sits above the pool price (funded in token0),
+ *              false = range sits below the pool price (funded in token1)
+ * @param tradedIsToken0 which side of the pool the traded token is on. The
+ *        pool price is the *inverse* of the token's own price when the token is
+ *        token1, so the width has to be measured in the token's terms —
+ *        otherwise a 50% range comes out as a 33% one.
  */
 export function oneSidedTicks(
   currentPrice: number,
@@ -139,16 +144,24 @@ export function oneSidedTicks(
   dec0: number,
   dec1: number,
   spacing: number,
+  tradedIsToken0 = true,
 ): TickRange {
   if (!(pct > 0) || pct >= 100) throw new Error('One-sided width must be between 0 and 100%');
   const current = priceToTick(currentPrice, dec0, dec1);
 
-  // The far end is the requested distance from the **live price**, not from the
-  // aligned near end. Adding the width to the near end instead would make the
-  // range narrower than it was asked to be whenever the price does not sit
-  // exactly on a tick boundary — and with a wide tick spacing (1000 ticks is
-  // 10.5% a step) a 50% range came out as a 33% one.
-  const farPrice = above ? currentPrice * (1 + pct / 100) : currentPrice * (1 - pct / 100);
+  // The far end is the requested distance from the **live price** of the
+  // traded token, and in the traded token's own terms — that is the price the
+  // user reads and the price the range label shows. Adding the width to the
+  // aligned near end instead would make the range narrower than it was asked
+  // to be whenever the price does not sit exactly on a tick boundary — and
+  // with a wide tick spacing (1000 ticks is 10.5% a step) a 50% range came
+  // out as a 33% one.
+  const tradedPrice = tradedIsToken0 ? currentPrice : 1 / currentPrice;
+  const aboveInTradedTerms = tradedIsToken0 ? above : !above;
+  const farTradedPrice = aboveInTradedTerms
+    ? tradedPrice * (1 + pct / 100)
+    : tradedPrice * (1 - pct / 100);
+  const farPrice = tradedIsToken0 ? farTradedPrice : 1 / farTradedPrice;
   const far = priceToTick(farPrice, dec0, dec1);
 
   if (above) {

@@ -620,6 +620,7 @@ addresses above, and that the computed v4 pool ids resolve to real pools.
 | `npm run preview:card` | Renders the card layouts (profit, loss, IDR) with fixture data |
 | `npm run preview:calendar` | Renders the calendar views from real closed records |
 | `npm run smoke:0x -- <token>` | Quotes a 0x swap for a token — reads only, never sends |
+| `npm run repair:swap-pnl` | Recomputes the PnL of the closed records that had a swap, reading the amounts from the transactions. A dry run unless it is called with `--write` |
 | `npm run smoke:gmgn` | Reports which GMGN credentials are configured and whether the API accepts them |
 | `npm run preview:text` | Renders every position screen with fixture data |
 | `npm run smoke` | Store + reader + valuation + one monitor pass, no Telegram |

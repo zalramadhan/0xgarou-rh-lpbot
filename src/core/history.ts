@@ -209,7 +209,10 @@ export interface SwapAccounting {
    * received amount, so it is never subtracted a second time.
    */
   feeUsd?: number;
-  /** The value of the token that was not swapped, in USD. */
+  /**
+   * Everything that stayed in the wallet, in USD: the token the swap did not
+   * sell and the quote that was withdrawn next to it.
+   */
   leftoverUsd: number;
 }
 
@@ -233,6 +236,14 @@ export function swapAccounting(
      * a swap that failed leaves the whole withdrawal in the wallet.
      */
     exitPrice?: number;
+    /**
+     * The value of the quote that was withdrawn next to the token, in USD.
+     *
+     * The swap only sells the token, so the quote stays in the wallet — and it
+     * is part of what the position was worth. Leaving it out made a close
+     * with a swap look like a total loss.
+     */
+    quoteUsd?: number;
   },
 ): SwapAccounting {
   // Only a swap that went through sold anything; a failed one left the
@@ -251,11 +262,15 @@ export function swapAccounting(
   // A swap that delivered nothing left the whole withdrawal in the wallet:
   // it is worth the price it had at the close.
   const exitPrice = input.exitPrice ?? Number.NaN;
-  const leftoverUsd = Number.isFinite(rate)
+  const leftoverTokenUsd = Number.isFinite(rate)
     ? leftoverHuman * rate
     : Number.isFinite(exitPrice)
       ? leftoverHuman * exitPrice
       : Number.NaN;
+  // The quote the close withdrew next to the token stayed in the wallet as
+  // well. It is part of the position's value, so it belongs here.
+  const quoteUsd = input.quoteUsd !== undefined && Number.isFinite(input.quoteUsd) ? input.quoteUsd : 0;
+  const leftoverUsd = leftoverTokenUsd + quoteUsd;
 
   return {
     route: outcome.route,

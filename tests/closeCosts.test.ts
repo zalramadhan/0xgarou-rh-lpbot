@@ -82,6 +82,52 @@ describe('the gas of a round trip', () => {
     expect(updated.pnlNetUsd).toBeUndefined();
   });
 
+  it('counts the quote that stayed in the wallet', () => {
+    // The close withdrew 25 tokens and 47.79 USDG. The swap only sells the
+    // token, so the USDG stays in the wallet — and it is part of what the
+    // position was worth. Leaving it out made the PnL look like a total loss
+    // when the money was simply there.
+    const accounting = swapAccounting(swapOutcome({ soldAmount: 25n * 10n ** 18n }), {
+      withdrawnAmount: 25n * 10n ** 18n,
+      decimals: 18,
+      ethPriceUsd: 3000,
+      exitPrice: 0.0016,
+      quoteUsd: 47.79,
+    });
+    // The token was sold, so nothing of it is left; the quote is.
+    expect(accounting.leftoverUsd).toBeCloseTo(47.79, 6);
+
+    const updated = withSwap(
+      record({ basisUsd: 53.61, openGasUsd: 0.0127, closeGasUsd: 0.0099, exitValueUsd: 55.5 }),
+      accounting,
+    );
+    // 40 USDG received + 47.79 USDG left - the gas - the basis.
+    // (the swap's gas is 0.001 ETH at $3000, so $3)
+    expect(updated.pnlNetUsd).toBeCloseTo(40 + 47.79 - 0.0127 - 0.0099 - 3 - 53.61, 6);
+  });
+
+  it('does not count the token twice when the swap sold it all', () => {
+    // A route that does not say what it sold (the old 0x route) looked like
+    // the whole withdrawal was still in the wallet, and the swapped tokens were
+    // valued a second time.
+    const withSold = swapAccounting(swapOutcome({ soldAmount: 25n * 10n ** 18n }), {
+      withdrawnAmount: 25n * 10n ** 18n,
+      decimals: 18,
+      ethPriceUsd: 3000,
+      exitPrice: 0.0016,
+    });
+    expect(withSold.leftoverUsd).toBeCloseTo(0, 6);
+
+    const withoutSold = swapAccounting(swapOutcome({ soldAmount: undefined }), {
+      withdrawnAmount: 25n * 10n ** 18n,
+      decimals: 18,
+      ethPriceUsd: 3000,
+      exitPrice: 0.0016,
+    });
+    // 25 tokens at $0.0016 — the whole withdrawal, valued a second time.
+    expect(withoutSold.leftoverUsd).toBeCloseTo(0.04, 6);
+  });
+
   it('says that a dry run spent nothing', () => {
     const lines = costLines(record({ dryRun: true, openGasUsd: 0, closeGasUsd: 0, feesAndGasUsd: 0 }));
     expect(lines.join('\n')).toContain('not incurred');

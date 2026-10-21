@@ -19,6 +19,7 @@
     "preview:card": "tsx scripts/preview-pnl-card.ts",
     "preview:calendar": "tsx scripts/preview-calendar.ts",
     "smoke:0x": "tsx scripts/smoke-0x-swap.ts",
+    "repair:swap-pnl": "tsx scripts/repair-swap-pnl.ts",
     "smoke:gmgn": "tsx scripts/smoke-gmgn.ts",
     "simulate:actions": "tsx scripts/simulate-actions.ts",
     "smoke": "tsx scripts/smoke.ts"

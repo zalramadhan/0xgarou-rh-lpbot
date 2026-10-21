@@ -362,6 +362,14 @@ export interface SwapResult {
   /** The route that was used. */
   route: '0x' | 'uniswap-v3';
   hash?: Hex;
+  /**
+   * The token amount that was sold, in base units.
+   *
+   * The accounting needs it to tell what is still in the wallet: without it
+   * the whole withdrawal looks unsold and the position's value is counted
+   * twice.
+   */
+  soldAmount?: bigint;
   /** The USDG received, when it is known. */
   receivedUsdg?: bigint;
   /** The estimated gas cost in native units. */
@@ -392,7 +400,13 @@ export async function executeZeroXSwap(
         const state: SwapState = receipt.status === 'success' ? 'confirmed' : 'failed';
         states.set(options.key, { state, hash: existing.hash, updatedAt: Date.now() });
         return receipt.status === 'success'
-          ? { ok: true, route: '0x', hash: existing.hash, note: 'The swap was already confirmed.' }
+          ? {
+              ok: true,
+              route: '0x',
+              hash: existing.hash,
+              soldAmount: quote.sellAmount,
+              note: 'The swap was already confirmed.',
+            }
           : {
               ok: false,
               route: '0x',
@@ -506,6 +520,9 @@ export async function executeZeroXSwap(
         ok: true,
         route: '0x',
         hash,
+        // What was sold: the quote says it, and the receipt confirms the
+        // money arrived. The accounting needs this to know what is left.
+        soldAmount: quote.sellAmount,
         receivedUsdg: received,
         gasNative,
         note:

@@ -198,22 +198,31 @@ These are the rules that are easy to break by accident.
     that trades *against* a quote has a small listing, and it is the only way
     to find a pool the standard probes cannot guess.
 27. **A chosen width is the width that was chosen.** A one-sided range reaches
-    the requested distance from the **live price** — "▼ -50%" is 50% below it,
-    not a third of the way down. The near bound sits on a tick boundary, so it
-    is as close to the price as the tick spacing allows (a pool with 1000-tick
-    spacing cannot do better than 10.5% a step), and the far end is rounded to
-    the grid the same way.
-28. **A range is shown in market cap only.** The market cap of a price is the
+    the requested distance from the **traded token's** live price — "▼ -50%" is
+    50% below it. The width must be measured in the token's own terms: the
+    pool price is the inverse of the token's price when the token is token1, so
+    measuring it in the pool's terms turns a 50% range into a 33% one. The
+    *direction* (which side of the market the range sits on, so the deposit
+    holds a single token) is a pool-side question and stays in the pool's
+    terms. The near bound sits on a tick boundary, so it is as close to the
+    price as the tick spacing allows.
+28. **A swap's accounting counts everything that is in the wallet.** The close
+    withdraws the position's amounts *and* the fees it collected; the swap
+    sells only the token, so the quote stays in the wallet. All of it is part
+    of what the position was worth. A route that does not report what it sold
+    makes the swapped tokens look like they are still there, and the value is
+    counted twice.
+29. **A range is shown in market cap only.** The market cap of a price is the
     supply times that price, so a bound keeps its market cap for as long as
     the supply does not change. The market cap line is built from the supply
     (the indexer's FDV divided by the price it used for it), never by scaling a
     stale FDV with the live price — that made the bounds drift every time the
     price moved. The "now" is the live price times the supply.
-29. **The home screen is instant.** The menu draws the last view of every
+30. **The home screen is instant.** The menu draws the last view of every
     position, which the monitor produces on every tick. A stale view is
     refreshed in the background, a cold one is waited for; either way the menu
     never holds the user up for the chain.
-30. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+31. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 

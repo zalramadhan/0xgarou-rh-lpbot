@@ -120,6 +120,27 @@ describe('one-sided ranges', () => {
     }
   });
 
+  it('measures the width in the traded token’s terms when the token is token1', () => {
+    // The pool price is the *inverse* of the token's own price when the token
+    // is token1 — the pool stores RAETO per USDG, the user reads USDG per
+    // RAETO. The width belongs to the price the user reads, so a 50% range has
+    // to reach 50% away in those terms. Measured in the pool's terms it came
+    // out at a third, because a pool price of 1.5× is a token price of 0.67×.
+    const tradedNow = 1 / PRICE;
+    const range = oneSidedTicks(PRICE, 50, true, DEC0, DEC1, SPACING, false);
+    const farTraded = 1 / tickToPrice(range.tickUpper, DEC0, DEC1);
+    // At least 50% below the token's price, and never more than one step off.
+    expect(farTraded / tradedNow).toBeLessThanOrEqual(0.5);
+    expect(farTraded / tradedNow).toBeGreaterThan(0.5 / 1.0001 ** SPACING);
+
+    // The other way round: the traded token is token0, the pool price is its
+    // own price, and the width is measured in the very same terms.
+    const direct = oneSidedTicks(PRICE, 50, true, DEC0, DEC1, SPACING, true);
+    const farDirect = tickToPrice(direct.tickUpper, DEC0, DEC1);
+    expect(farDirect / PRICE).toBeGreaterThanOrEqual(1.5);
+    expect(farDirect / PRICE).toBeLessThan(1.5 * 1.0001 ** SPACING);
+  });
+
   it('full range brackets the live tick', () => {
     const full = fullRangeTicks(SPACING);
     expect(full.tickLower).toBeLessThan(TICK);
