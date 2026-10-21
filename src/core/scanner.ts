@@ -1,5 +1,5 @@
 import { zeroAddress, type Address, type Hex } from 'viem';
-import { isDynamicFee } from '../constants/chain.js';
+import { isDynamicFee, TOKENS } from '../constants/chain.js';
 import { createLogger } from '../logger.js';
 import { fetchIndexerPools, type IndexerPool } from './indexer.js';
 import { recoverV4Key, recoverV4Keys } from './discovery.js';
@@ -115,12 +115,61 @@ function feeFraction(pool: Pool): number {
   return raw / 1_000_000;
 }
 
-function healthOf(tvlUsd: number, deviationPct: number): PoolHealth {
+function healthOf(tvlUsd: number, deviationPct: number, volume24hUsd: number): PoolHealth {
   if (Number.isFinite(deviationPct) && Math.abs(deviationPct) > BROKEN_DEVIATION_PCT) return 'broken';
   if (tvlUsd < BLOCKED_TVL_USD) return 'blocked';
   if (tvlUsd < WARN_TVL_USD) return 'warn';
   if (Number.isFinite(deviationPct) && Math.abs(deviationPct) > WARN_DEVIATION_PCT) return 'warn';
+  // Without a market price there is nothing to compare the pool against, so it
+  // is judged by its TVL and its volume alone.
+  if (!Number.isFinite(deviationPct) && !(volume24hUsd > 0)) return 'warn';
   return 'ok';
+}
+
+/**
+ * The market price a pool's price is compared against.
+ *
+ * The reference is the deepest pool that trades against USDG — that is the
+ * quote the prices are compared in. A WETH pool is the fallback, priced
+ * through the WETH/USDG feed. A pool whose own price is nonsense is never
+ * used: one scam pool would then condemn every other pool (a microduck pool
+ * quoted in AI once made every USDG pool look a quintillion percent away).
+ *
+ * When there is no such pool there is no reference, and the pools are judged
+ * by their TVL and their volume alone.
+ */
+export function pickReferencePrice(
+  candidates: { priceUsd: number; tvlUsd: number; quote: 'usdg' | 'weth' | 'other' }[],
+): number {
+  const deepest = (quote: 'usdg' | 'weth'): number => {
+    let best = Number.NaN;
+    let deepestTvl = -1;
+    for (const candidate of candidates) {
+      if (candidate.quote !== quote) continue;
+      if (!Number.isFinite(candidate.priceUsd) || candidate.priceUsd <= 0) continue;
+      if (candidate.tvlUsd > deepestTvl) {
+        deepestTvl = candidate.tvlUsd;
+        best = candidate.priceUsd;
+      }
+    }
+    return best;
+  };
+  const usdg = deepest('usdg');
+  if (Number.isFinite(usdg)) return usdg;
+  return deepest('weth');
+}
+
+/**
+ * A deviation that is too big to print.
+ *
+ * A pool priced against a broken quote can be a quintillion percent away; the
+ * number says "broken" and nothing more.
+ */
+export function formatDeviationPct(deviationPct: number): string {
+  if (!Number.isFinite(deviationPct)) return '—';
+  const abs = Math.abs(deviationPct);
+  if (abs > 999) return 'more than 999%';
+  return `${abs.toFixed(1)}%`;
 }
 
 /**
@@ -198,18 +247,30 @@ async function runScan(token: TokenInfo): Promise<TokenScan> {
   const priceList = await mapLimit(pools, 6, (pool) => priceFromPool(pool, token));
   const prices = new Map<string, number>();
   pools.forEach((pool, index) => prices.set(poolKeyOf(pool), priceList[index] ?? Number.NaN));
-  // The deepest pool is the best available reference for "the market price".
-  let referencePriceUsd = Number.NaN;
-  let deepestTvl = -1;
-  for (const pool of pools) {
-    const entry = stats.get(poolKeyOf(pool));
-    const tvl = entry?.reserveUsd ?? 0;
-    const price = prices.get(poolKeyOf(pool)) ?? Number.NaN;
-    if (Number.isFinite(price) && tvl > deepestTvl) {
-      deepestTvl = tvl;
-      referencePriceUsd = price;
-    }
-  }
+  // The market reference: the deepest pool that trades against USDG, because
+  // that is the quote the prices are compared in. A pool whose own price is
+  // nonsense must never become the reference — one scam pool would then
+  // condemn every other pool (a microduck pool quoted in AI once made every
+  // USDG pool look a quintillion percent away).
+  const usdgAddress = TOKENS.USDG.toLowerCase();
+  const wethAddress = TOKENS.WETH.toLowerCase();
+  const referencePriceUsd = pickReferencePrice(
+    pools.map((pool) => {
+      const token0 = pool.token0.address.toLowerCase();
+      const token1 = pool.token1.address.toLowerCase();
+      const quote =
+        token0 === usdgAddress || token1 === usdgAddress
+          ? 'usdg'
+          : token0 === wethAddress || token1 === wethAddress
+            ? 'weth'
+            : 'other';
+      return {
+        priceUsd: prices.get(poolKeyOf(pool)) ?? Number.NaN,
+        tvlUsd: stats.get(poolKeyOf(pool))?.reserveUsd ?? 0,
+        quote,
+      };
+    }),
+  );
 
   // A pool the indexer has no TVL for is measured from its own liquidity.
   const depths = await mapLimit(pools, 6, async (pool) => {
@@ -253,7 +314,7 @@ async function runScan(token: TokenInfo): Promise<TokenScan> {
       aprPct,
       priceUsd,
       deviationPct,
-      health: healthOf(tvlUsd, deviationPct),
+      health: healthOf(tvlUsd, deviationPct, volume24hUsd),
     });
   });
 

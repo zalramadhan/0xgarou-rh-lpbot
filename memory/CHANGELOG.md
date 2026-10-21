@@ -65,6 +65,49 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The market price comes from a USDG pool
+
+**Area:** core (scanner), bot (new flow), tests
+
+**What changed**
+- **The "market price" could come from a broken pool.** The scan took the
+  deepest pool as the reference, whatever it traded against. For microduck the
+  deepest pool was AI/microduck (TVL $344K) — and the AI token has no market,
+  so its USD price was 2.66e-40. Every USDG pool's price was then compared
+  against that: 0.0056 ÷ 2.66e-40 = **2.1e+39% away**, so healthy pools were
+  flagged "broken" and the tap said *"pick another pool"* while the list still
+  showed the pool as normal.
+- **The reference is now the deepest USDG pool** — the quote the prices are
+  compared in. A WETH pool is the fallback (priced through the WETH/USDG feed),
+  and a pool whose own price is nonsense is never used.
+  ```
+  reference price (USD): 0.005052741132748112
+  AI/microduck    v4 1.5%    TVL $344,577   price 2.66e-40   dev 100.0%   broken
+  USDG/microduck  v4 3.85%   TVL $149,261   price 0.005053   dev 0.0%     ok
+  USDG/microduck  v4 0.78%   TVL $56,710    price 0.005002   dev 1.0%     ok
+  USDG/microduck  v4 2%      TVL $8,543     price 0.006460   dev 27.9%    broken
+  WETH/microduck  v3 1%      TVL $4,414     price 0.004984   dev 1.4%     ok
+  ```
+- **A token with no reference** — no USDG pool and no WETH pool — has no
+  market price, so its pools are judged by their **TVL and their volume**
+  alone.
+- **A deviation that is too big to print is capped** ("more than 999%") instead
+  of `1.7882632032650125e+39%`.
+- **The pool name in the tap message** uses the bot's usual order
+  (the pasted token first), so it matches the row in the list.
+
+**Files**
+- `src/core/scanner.ts` — `pickReferencePrice`, `formatDeviationPct`, the health
+  without a market price.
+- `src/bot/newFlow.ts` — the tap message.
+- `tests/marketReference.test.ts` — **new**.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 413/413 pass (38 files)
+
+---
+
 ## 2026-10-21 — The position card is one screenful
 
 **Area:** bot (ui), tests

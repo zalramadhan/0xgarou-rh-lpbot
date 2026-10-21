@@ -254,7 +254,14 @@ These are the rules that are easy to break by accident.
     rebalance/OOR-TP, compound/APR and age lines are gone; the TP/SL and the
     auto-TP lines stay, because a rule you set but cannot see is a rule you
     forget.
-37. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+37. **The market price comes from a USDG pool.** The deepest pool is the
+    reference only when it trades against USDG — the quote the prices are
+    compared in. A WETH pool is the fallback, and a pool whose own price is
+    nonsense (a token quoted in a token that has no market) is never used: one
+    such pool used to make every healthy pool look a quintillion percent away.
+    A token with no reference has no market price, and its pools are judged by
+    their TVL and volume alone.
+38. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 

@@ -27,6 +27,7 @@ import {
 } from '../core/bidAsk.js';
 import { formatRangeLabel } from '../card/data.js';
 import {
+  formatDeviationPct,
   marketCapInfo as fetchMarketCap,
   tokenSupply,
   UNKNOWN_MARKET_CAP,
@@ -733,7 +734,7 @@ export async function handleNewCallback(ctx: Context, data: string): Promise<boo
     await answer(ctx);
     if (entry.health === 'broken') {
       await ctx.reply(
-        `❌ <b>${esc(entry.pool.token0.symbol)}/${esc(entry.pool.token1.symbol)}</b> trades at $${esc(fmtPriceUsd(entry.priceUsd))}, ${Math.abs(entry.deviationPct).toFixed(1)}% away from the market price.\n\nOpening here would hand your deposit to arbitrageurs. Pick another pool.`,
+        `❌ <b>${esc(pairLabel(entry.pool, session.token))}</b> trades at $${esc(fmtPriceUsd(entry.priceUsd))}, ${esc(formatDeviationPct(entry.deviationPct))} away from the market price.\n\nOpening here would hand your deposit to arbitrageurs. Pick another pool.`,
         { parse_mode: 'HTML' },
       );
       return true;
