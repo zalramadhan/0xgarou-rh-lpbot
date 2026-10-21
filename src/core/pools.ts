@@ -171,6 +171,18 @@ export async function readV4PoolByKey(key: PoolKeyShape, token0: TokenInfo, toke
 }
 
 /** Every initialized v3 pool for the pair, across standard fee tiers. */
+/**
+ * True when the token has a Uniswap v3 pool against the quote.
+ *
+ * The V3 swap route needs one. A token that only trades in v4 pools can never
+ * be swapped that way, and the user should hear it *before* the position is
+ * closed — not after, with the tokens already in the wallet.
+ */
+export async function hasV3Pool(token: Address, quote: Address): Promise<boolean> {
+  const pools = await findV3Pools(token, quote).catch(() => [] as V3Pool[]);
+  return pools.length > 0;
+}
+
 async function findV3Pools(tokenA: Address, tokenB: Address): Promise<V3Pool[]> {
   let failures = 0;
   const results = await Promise.all(

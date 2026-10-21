@@ -212,20 +212,31 @@ These are the rules that are easy to break by accident.
     of what the position was worth. A route that does not report what it sold
     makes the swapped tokens look like they are still there, and the value is
     counted twice.
-29. **A range is shown in market cap only.** The market cap of a price is the
+29. **A swap sells the whole withdrawal.** The fees the close collected are
+    part of it — swapping only the liquidity leaves them behind (1,457
+    IGNITION, about $1.39, in the IGNITION close). The amount the bot shows is
+    the amount it swaps.
+30. **A route has to be near the market.** The 0x quote's own rate is compared
+    with the live pool price; more than 3% below it and the tokens stay in the
+    wallet with a note that says why. The comparison uses the pool's price,
+    not the price feed — the feed is minutes old on a busy token.
+31. **A token with no v3 pool is told before the close.** The V3 route cannot
+    swap a token that only trades in v4 pools, and the user should hear that
+    before the position is closed, not after.
+32. **A range is shown in market cap only.** The market cap of a price is the
     supply times that price, so a bound keeps its market cap for as long as
     the supply does not change. The market cap line is built from the supply
     (the indexer's FDV divided by the price it used for it), never by scaling a
     stale FDV with the live price — that made the bounds drift every time the
     price moved. The "now" is the live price times the supply.
-30. **A one-sided entry is not an out-of-range alert.** The position waits for
+33. **A one-sided entry is not an out-of-range alert.** The position waits for
     the price to come into its range, so it is out of range from the start.
     The bar still shows the state; only the first-observation alert is gone.
-31. **The home screen is instant.** The menu draws the last view of every
+34. **The home screen is instant.** The menu draws the last view of every
     position, which the monitor produces on every tick. A stale view is
     refreshed in the background, a cold one is waited for; either way the menu
     never holds the user up for the chain.
-32. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+35. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 

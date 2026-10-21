@@ -1,6 +1,6 @@
 import { encodePacked, keccak256, toHex, zeroAddress, type Address, type Hex } from 'viem';
 import { v3FactoryAbi, v3PoolAbi, v3PositionManagerAbi, v4PositionManagerAbi, v4StateViewAbi } from '../constants/abis.js';
-import { CONTRACTS, ETH_SENTINEL } from '../constants/chain.js';
+import { CONTRACTS, ETH_SENTINEL, TOKENS } from '../constants/chain.js';
 import { publicClient } from '../chain/client.js';
 import { accruedFees, feeGrowthInside } from './math/liquidityMath.js';
 import { isInRange, positionAmounts } from './math/positionMath.js';
@@ -294,6 +294,43 @@ export async function readPosition(
 export async function detectVersion(tokenId: bigint): Promise<PositionVersion | undefined> {
   if (await ownerOf('v3', tokenId)) return 'v3';
   if (await ownerOf('v4', tokenId)) return 'v4';
+  return undefined;
+}
+
+/**
+ * What a close withdraws into the wallet: the token that is not USDG, and how
+ * much of it.
+ *
+ * The close collects the position's amounts **and** the fees it earned, so the
+ * withdrawal is more than the position's liquidity. Swapping only the
+ * liquidity leaves the fees behind in the wallet — for IGNITION that was 1,457
+ * tokens, about $1.39, that never became USDG.
+ */
+export function withdrawnToken(snapshot: PositionSnapshot): { token: TokenInfo; amount: bigint } | undefined {
+  const usdg = TOKENS.USDG.toLowerCase();
+  if (snapshot.token0.address.toLowerCase() !== usdg) {
+    return { token: snapshot.token0, amount: snapshot.amount0 + snapshot.fees0 };
+  }
+  if (snapshot.token1.address.toLowerCase() !== usdg) {
+    return { token: snapshot.token1, amount: snapshot.amount1 + snapshot.fees1 };
+  }
+  return undefined;
+}
+
+/**
+ * The quote that was withdrawn next to the token, in base units.
+ *
+ * The swap only sells the token, so the quote stays in the wallet — and it is
+ * part of what the position was worth.
+ */
+export function withdrawnQuote(snapshot: PositionSnapshot): { token: TokenInfo; amount: bigint } | undefined {
+  const usdg = TOKENS.USDG.toLowerCase();
+  if (snapshot.token0.address.toLowerCase() === usdg) {
+    return { token: snapshot.token0, amount: snapshot.amount0 + snapshot.fees0 };
+  }
+  if (snapshot.token1.address.toLowerCase() === usdg) {
+    return { token: snapshot.token1, amount: snapshot.amount1 + snapshot.fees1 };
+  }
   return undefined;
 }
 

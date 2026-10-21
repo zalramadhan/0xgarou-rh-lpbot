@@ -95,6 +95,10 @@ type Session =
       amount: bigint;
       valueUsd: number;
       pair: string;
+      /** False when the token has no Uniswap v3 pool, so the V3 route cannot swap it. */
+      v3Route?: boolean;
+      /** The live market price of the token, in USD, to judge a route against. */
+      marketUsd?: number;
       /** The close receipt, frozen when the position was closed. */
       receipt: string[];
     }
@@ -107,6 +111,10 @@ type Session =
       amount: bigint;
       valueUsd: number;
       pair: string;
+      /** False when the token has no Uniswap v3 pool, so the V3 route cannot swap it. */
+      v3Route?: boolean;
+      /** The live market price of the token, in USD, to judge a route against. */
+      marketUsd?: number;
       /** The close receipt, frozen when the position was closed. */
       receipt: string[];
     }

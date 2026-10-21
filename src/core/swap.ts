@@ -22,6 +22,25 @@ import {
 
 const log = createLogger('swap');
 
+/**
+ * How far below the market a route may be priced before the swap is
+ * refused. A healthy route on a thin token is one to one and a half percent
+ * off; three percent is already a bad route.
+ */
+const MAX_ROUTE_DISCOUNT_PCT = 3;
+
+/**
+ * How far below the market a route is priced, in percent.
+ *
+ * A negative number means the route is *better* than the market. NaN when
+ * either price is unknown — then the route is not judged.
+ */
+export function routeDiscountPct(impliedUsd: number, marketUsd: number): number {
+  if (!Number.isFinite(impliedUsd) || impliedUsd <= 0) return Number.NaN;
+  if (!Number.isFinite(marketUsd) || marketUsd <= 0) return Number.NaN;
+  return ((marketUsd - impliedUsd) / marketUsd) * 100;
+}
+
 interface SwapPlan {
   poolFee: number;
   amountIn: bigint;
@@ -102,6 +121,13 @@ export async function swapProceedsToUsdg(options: {
   minUsd: number;
   /** The price of the buy token in USD, for the fee and gas accounting. */
   buyTokenUsd: number;
+  /**
+   * The market price of the token that is sold, in USD.
+   *
+   * A route that is priced far below the market is not a route — it is a loss
+   * that looks like a swap. The tokens stay in the wallet instead.
+   */
+  sellTokenUsd?: number;
   /** The route to use. `auto` tries 0x first and falls back to v3. */
   route?: SwapRoute | 'auto';
 }): Promise<SwapOutcome> {
@@ -158,6 +184,8 @@ async function swapViaZeroX(
     slippagePct: number;
     minUsd: number;
     buyTokenUsd: number;
+    /** The market price of the sold token, in USD. */
+    sellTokenUsd?: number;
   },
   sellAmount: bigint,
 ): Promise<SwapOutcome & { submitted?: boolean }> {
@@ -196,6 +224,31 @@ async function swapViaZeroX(
         quote,
         note: `🏏 After the 0x fees and the gas the swap is worth less than $${options.minUsd.toFixed(2)} — the tokens stayed in your wallet.`,
       };
+    }
+
+    // The route has to be near the market: the quote's own rate against the
+    // live price of the pool. A thin route can quote 5-10% below, and taking
+    // it would quietly cost a tenth of the position.
+    const market = options.sellTokenUsd;
+    if (market !== undefined && Number.isFinite(market) && market > 0) {
+      const soldHuman = Number(quote.sellAmount) / 10 ** token.decimals;
+      const boughtUsd = (Number(quote.buyAmount) / 1e6) * options.buyTokenUsd;
+      const impliedUsd = soldHuman > 0 ? boughtUsd / soldHuman : Number.NaN;
+      const below = routeDiscountPct(impliedUsd, market);
+      if (Number.isFinite(below)) {
+        if (below > MAX_ROUTE_DISCOUNT_PCT) {
+          return {
+            ok: false,
+            route: '0x',
+            skipped: true,
+            quote,
+            note:
+              `🏏 The 0x route is ${below.toFixed(1)}% below the market ($${impliedUsd.toFixed(6)} against $${market.toFixed(6)})` +
+              ' — the tokens stayed in your wallet.',
+            error: 'the route is too far below the market',
+          };
+        }
+      }
     }
 
     const result = await executeZeroXSwap(quote, { owner, dryRun, key });

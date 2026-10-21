@@ -20,10 +20,11 @@ import { performExit } from '../monitor/exits.js';
 import { exitNotificationLines } from '../monitor/notifyText.js';
 import { usdIdrRate } from '../core/fx.js';
 import { parseCycleLimit } from './parsers.js';
-import { readPosition, type PositionSnapshot, type PositionVersion } from '../core/positions.js';
+import { readPosition, withdrawnToken, type PositionSnapshot, type PositionVersion } from '../core/positions.js';
 import { marketCapInfo as fetchMarketCap, UNKNOWN_MARKET_CAP, type MarketCap } from '../core/scanner.js';
+import { hasV3Pool } from '../core/pools.js';
 import { rebalancePosition } from '../core/strategy.js';
-import { summarizePnl, valuate, type PnlSummary, type Valuation } from '../core/valuation.js';
+import { marketPriceUsd, summarizePnl, valuate, type PnlSummary, type Valuation } from '../core/valuation.js';
 import { loadView, type PositionView } from '../core/positionViews.js';
 import { store, type TrackedPosition } from '../store/store.js';
 import { esc, fmtAmount, fmtCompactUsd, fmtPct, fmtSignedUsd, fmtUsd } from '../utils/format.js';
@@ -342,19 +343,7 @@ export async function handlePositionCallback(ctx: Context, data: string): Promis
   }
 }
 
-/** The traded side of a closed position: the token and what was withdrawn. */
-function withdrawnToken(
-  snapshot: PositionSnapshot,
-): { token: PositionSnapshot['token0']; amount: bigint } | undefined {
-  const usdg = TOKENS.USDG.toLowerCase();
-  if (snapshot.token0.address.toLowerCase() !== usdg) {
-    return { token: snapshot.token0, amount: snapshot.amount0 };
-  }
-  if (snapshot.token1.address.toLowerCase() !== usdg) {
-    return { token: snapshot.token1, amount: snapshot.amount1 };
-  }
-  return undefined;
-}
+
 
 /**
  * Step 1 of the close flow: what closing the position will do.
@@ -402,6 +391,22 @@ async function showCloseConfirmation(ctx: Context, tracked: TrackedPosition): Pr
     '',
     `🔁 A swap to USDG would use at most <b>${settings.slippagePct}%</b> slippage (⚙️ Settings).`,
   );
+
+  // A token that only trades in v4 pools cannot be swapped through the V3
+  // route at all. Saying so now is much better than finding out after the
+  // close, with the tokens already in the wallet.
+  if (snapshot) {
+    const v3 = await hasV3Pool(snapshot.token0.address, snapshot.token1.address).catch(() => true);
+    const quote = snapshot.token0.address.toLowerCase() === TOKENS.USDG.toLowerCase()
+      ? snapshot.token1
+      : snapshot.token0;
+    if (!v3) {
+      lines.push(
+        '',
+        `⚠️ <b>${esc(quote.symbol)} has no Uniswap v3 pool</b> — only the 0x API can swap it.`,
+      );
+    }
+  }
 
   await ctx.reply(lines.join('\n'), {
     parse_mode: 'HTML',
@@ -461,6 +466,12 @@ async function handleCloseStep(
       '────────────',
       'Which route should do the swap?',
     ];
+    if (session.v3Route === false) {
+      lines.push(
+        '',
+        `⚠️ <b>${esc(session.token.symbol)} has no Uniswap v3 pool</b> — the V3 route cannot swap it.`,
+      );
+    }
     await ctx.reply(lines.join('\n'), {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
@@ -499,6 +510,9 @@ async function handleCloseStep(
       valueUsd: session.valueUsd,
       minUsd: 0,
       buyTokenUsd: 1,
+      // The live market price, so a route that is priced far below it is
+      // refused instead of taken.
+      sellTokenUsd: session.marketUsd,
       route,
     });
     swapped = outcome.ok;
@@ -718,6 +732,13 @@ async function runClose(ctx: Context, tracked: TrackedPosition): Promise<void> {
         return;
       }
 
+      // Whether the V3 route can swap this token at all — a token that only
+      // trades in v4 pools cannot.
+      const v3Route = await hasV3Pool(
+        snapshot.token0.address,
+        snapshot.token1.address,
+      ).catch(() => true);
+
       const flow = {
         positionId: tracked.id,
         recordId: result.recordId,
@@ -725,6 +746,8 @@ async function runClose(ctx: Context, tracked: TrackedPosition): Promise<void> {
         amount: side.amount,
         valueUsd: Number.isFinite(valueUsd) ? valueUsd : 0,
         pair: positionPair(snapshot),
+        v3Route,
+        marketUsd: valuation ? marketPriceUsd(snapshot, valuation) : undefined,
         receipt: lines,
       };
       setSession(chatId, { step: 'closeChoice', ...flow });

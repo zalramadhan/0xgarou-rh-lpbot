@@ -1,6 +1,6 @@
 import { usdPrice } from './prices.js';
 import { rangePrices, type PositionSnapshot } from './positions.js';
-import { tradedRange } from './pairs.js';
+import { quoteToken, tradedPrice, tradedRange } from './pairs.js';
 import { pctChange } from '../utils/format.js';
 
 export interface Valuation {
@@ -47,6 +47,24 @@ function priceFromPoolRate(
     return { price0Usd, price1Usd: price0Usd / rate };
   }
   return { price0Usd, price1Usd };
+}
+
+/**
+ * The traded token's price in USDG, from the pool's live price.
+ *
+ * The price feed is minutes old on a busy token, while the pool the position
+ * is in is live. A route that is priced against the market has to be compared
+ * with the market, so the comparison uses the live one.
+ */
+export function marketPriceUsd(snapshot: PositionSnapshot, valuation: Valuation): number {
+  const quote = quoteToken(snapshot);
+  const quoteUsd =
+    quote.address.toLowerCase() === snapshot.token0.address.toLowerCase()
+      ? valuation.price0Usd
+      : valuation.price1Usd;
+  const price = tradedPrice(snapshot, snapshot.price);
+  if (!Number.isFinite(price) || !Number.isFinite(quoteUsd) || quoteUsd <= 0) return Number.NaN;
+  return price * quoteUsd;
 }
 
 /** Values a position in USDG and measures how far price is from its bounds. */

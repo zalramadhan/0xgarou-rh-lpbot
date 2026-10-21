@@ -2,11 +2,11 @@ import type { Address } from 'viem';
 import { TOKENS } from '../constants/chain.js';
 import { closePosition } from '../core/actions.js';
 import { recordClose, swapAccounting, withSwap } from '../core/history.js';
-import type { PositionSnapshot } from '../core/positions.js';
+import { withdrawnQuote, withdrawnToken, type PositionSnapshot } from '../core/positions.js';
 import { reenterSameRange } from '../core/strategy.js';
 import { swapProceedsToUsdg, type SwapOutcome } from '../core/swap.js';
 import { usdPrice } from '../core/prices.js';
-import type { PnlSummary, Valuation } from '../core/valuation.js';
+import { marketPriceUsd, type PnlSummary, type Valuation } from '../core/valuation.js';
 import {
   store,
   type ChatSettings,
@@ -68,13 +68,6 @@ interface ExitResult {
   swapNote?: string;
 }
 
-function tokenSide(snapshot: PositionSnapshot): { token: PositionSnapshot['token0']; amount: bigint } | undefined {
-  const usdg = TOKENS.USDG.toLowerCase();
-  if (snapshot.token0.address.toLowerCase() !== usdg) return { token: snapshot.token0, amount: snapshot.amount0 };
-  if (snapshot.token1.address.toLowerCase() !== usdg) return { token: snapshot.token1, amount: snapshot.amount1 };
-  return undefined;
-}
-
 /**
  * What the close put in the wallet: the token the swap sells, and the quote
  * that stays there.
@@ -89,16 +82,16 @@ function withdrawal(
   snapshot: PositionSnapshot,
   valuation: Valuation,
 ): { tokenAmount: bigint; quoteUsd: number } {
-  const side = tokenSide(snapshot);
-  if (!side) return { tokenAmount: 0n, quoteUsd: Number.NaN };
-  const tokenIsToken0 = side.token.address.toLowerCase() === snapshot.token0.address.toLowerCase();
-  const tokenFees = tokenIsToken0 ? snapshot.fees0 : snapshot.fees1;
-  const quoteAmount = tokenIsToken0 ? valuation.amount1Human : valuation.amount0Human;
-  const quoteFees = tokenIsToken0 ? valuation.fees1Human : valuation.fees0Human;
-  const quotePrice = tokenIsToken0 ? valuation.price1Usd : valuation.price0Usd;
+  const side = withdrawnToken(snapshot);
+  const quote = withdrawnQuote(snapshot);
+  if (!side || !quote) return { tokenAmount: 0n, quoteUsd: Number.NaN };
+  const quoteIsToken0 = quote.token.address.toLowerCase() === snapshot.token0.address.toLowerCase();
+  const quoteAmount = quoteIsToken0 ? valuation.amount0Human : valuation.amount1Human;
+  const quoteFees = quoteIsToken0 ? valuation.fees0Human : valuation.fees1Human;
+  const quotePrice = quoteIsToken0 ? valuation.price0Usd : valuation.price1Usd;
   const quoteTotal = (quoteAmount + quoteFees) * quotePrice;
   return {
-    tokenAmount: side.amount + tokenFees,
+    tokenAmount: side.amount,
     quoteUsd: Number.isFinite(quoteTotal) ? quoteTotal : Number.NaN,
   };
 }
@@ -111,7 +104,9 @@ async function autoSwap(
   valuation: Valuation,
   key: string,
 ): Promise<{ note: string; outcome?: SwapOutcome }> {
-  const side = tokenSide(snapshot);
+  // The whole withdrawal, fees included: the close collected them, so they
+  // are part of what the swap can turn into USDG.
+  const side = withdrawnToken(snapshot);
   if (!side) return { note: '🤝 Both sides are USDG — nothing to swap.' };
   if (side.amount <= 0n) return { note: '🤏 Nothing to swap.' };
 
@@ -145,6 +140,9 @@ async function autoSwap(
     minUsd: threshold,
     // USDG is the USD unit of this chain, so it is worth one dollar.
     buyTokenUsd: 1,
+    // The live market price, so a route that is priced far below it is
+    // refused instead of taken.
+    sellTokenUsd: marketPriceUsd(snapshot, valuation),
   });
   return { note: outcome.note, outcome };
 }
@@ -237,7 +235,7 @@ export async function performExit(params: ExitParams): Promise<ExitResult> {
     if (swapOutcome) {
       // A swap that failed still cost its gas, so the record is updated for
       // it as well.
-      const side = tokenSide(snapshot);
+      const side = withdrawnToken(snapshot);
       const ethPriceUsd = await usdPrice(TOKENS.WETH).catch(() => Number.NaN);
       const taken = withdrawal(snapshot, valuation);
       const accounting = swapAccounting(swapOutcome, {

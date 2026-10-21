@@ -46,6 +46,46 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The swap sells the whole withdrawal, and a bad route is refused
+
+**Area:** core (positions, swap, valuation, pools), bot (close flow), monitor (exits), tests
+
+**What changed**
+- **The swap left the collected fees behind.** Both swap paths asked the
+  *snapshot* for the amount, and the snapshot's amounts are the position's
+  liquidity — the close also withdraws the fees. The IGNITION close withdrew
+  9,564.81 IGNITION and the swap sold 8,107.34: **1,457 IGNITION (about $1.39)
+  never became USDG**. The swap now sells the whole withdrawal, fees
+  included, and the amount the bot shows ("🪙 9,564.81 IGNITION was
+  withdrawn") is the amount it swaps.
+- **A token with no Uniswap v3 pool says so before the close.** IGNITION only
+  trades in v4 pools, so the "V3 Pool" route could never swap it — the user
+  found out after the close, with the tokens already in the wallet. The close
+  confirmation and the route step now say that only the 0x API can swap it.
+- **A route priced far below the market is refused.** The 0x quote was taken at
+  face value: a thin route can quote 5-10% under the market, and the bot would
+  have done it without a word. The quote's own rate is now compared with the
+  live pool price, and more than 3% below it means the tokens stay in the
+  wallet with a note that says why.
+
+**Files**
+- `src/core/positions.ts` — `withdrawnToken` and `withdrawnQuote` (the whole
+  withdrawal, fees included).
+- `src/core/swap.ts` — the route guard, `routeDiscountPct`.
+- `src/core/valuation.ts` — `marketPriceUsd` (the live pool price, not the
+  minutes-old feed).
+- `src/core/pools.ts` — `hasV3Pool`.
+- `src/monitor/exits.ts`, `src/bot/positionsFlow.ts` — the swap sells the
+  withdrawal; the close flow says which routes can work.
+- `src/bot/session.ts` — the close session carries the route facts.
+- `tests/swapWithdrawal.test.ts` — **new**.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 391/391 pass (35 files)
+
+---
+
 ## 2026-10-21 — The range width is the width that was asked for, and a swap no longer looks like a loss
 
 **Area:** core (tick maths, history, zeroX), bot (new flow), monitor (exits), scripts, tests
