@@ -7,6 +7,7 @@ import {
   positionRow,
   poolLine,
   rangeVisual,
+  rangeWidthPct,
 } from '../src/bot/ui.js';
 import type { PositionSnapshot } from '../src/core/positions.js';
 import type { Valuation, PnlSummary } from '../src/core/valuation.js';
@@ -83,6 +84,7 @@ const tracked: TrackedPosition = {
   stopLossPct: -20,
   autoTakeProfit: true,
   tpCycles: 3,
+  rangeLabel: '-37% to -7%',
   cycle: 2,
   oorTakeProfit: true,
   lastRebalanceAt: Date.now() - 3_600_000,
@@ -101,9 +103,12 @@ describe('position rendering', () => {
     expect(text).toContain('📊 +$2.40 (+5.10%)');
     expect(text).toContain('🎯 TP +30% · SL -20%');
     expect(text).toContain('⚡ Auto-TP +1.5% · Cycle 2/3');
-    expect(text).toContain('🔄 Rebalance is manual · OOR TP ON');
-    expect(text).toContain('🧩 Compound 6h · APR 12.4%');
-    expect(text).toContain('⏱ Age 2h · Last rebalance 1h');
+    // The second line: the state, the age, the strategy and the width of the
+    // range. The old trailing lines are gone.
+    expect(text).toContain('IN RANGE ⏱ Age 2h · Last rebalance 1h · Spot 30%');
+    expect(text).not.toContain('Rebalance is manual');
+    expect(text).not.toContain('Compound');
+    expect(text).not.toContain('APR');
     expect(text).not.toContain('undefined');
     expect(text).not.toContain('NaN');
   });
@@ -124,6 +129,17 @@ describe('position rendering', () => {
         marketCap: { fdvUsd: 1_300_000, priceUsd: 0.00167 },
       }),
     ).toContain('now $1,30M');
+  });
+
+  it('reads the width of the range from its label', () => {
+    // "-37% to -7%" is a range that is 30% wide — that is what the card
+    // shows next to the strategy.
+    expect(rangeWidthPct(tracked)).toBe(30);
+    expect(rangeWidthPct({ ...tracked, rangeLabel: '-33% to -1%' })).toBe(32);
+    expect(rangeWidthPct({ ...tracked, rangeLabel: '-15% to +16%' })).toBe(31);
+    // A position without a range label has no width to show.
+    expect(rangeWidthPct({ ...tracked, rangeLabel: undefined })).toBeUndefined();
+    expect(rangeWidthPct({ ...tracked, rangeLabel: 'nonsense' })).toBeUndefined();
   });
 
   it('scales the market cap with the range bounds', () => {

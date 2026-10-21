@@ -248,7 +248,13 @@ These are the rules that are easy to break by accident.
     day's net not matching the rows. The net PnL and the fees are unchanged:
     they are the truth and they count every close. The rule lives in
     `src/constants/dust.ts` and both screens use it.
-36. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+36. **The position card is one screenful.** The second line says what the
+    position is: the state, the age, the strategy and the width of the range
+    (the distance between its bounds, read from the range label). The
+    rebalance/OOR-TP, compound/APR and age lines are gone; the TP/SL and the
+    auto-TP lines stay, because a rule you set but cannot see is a rule you
+    forget.
+37. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 

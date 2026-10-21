@@ -277,7 +277,7 @@ describe('per-position automation controls', () => {
     await store.remove(created.id);
   });
 
-  it('shows the auto-TP target, cycle counter and OOR state on the card', () => {
+  it('shows the auto-TP target, the cycle counter and the facts on the card', () => {
     const snapshot = {
       version: 'v4', tokenId: 9n, owner: '0x0000000000000000000000000000000000000001',
       token0: { address: '0x5fc5360d0400a0fd4f2af552add042d716f1d168', symbol: 'USDG', name: 'Global Dollar', decimals: 6 },
@@ -297,12 +297,14 @@ describe('per-position automation controls', () => {
 
     const text = positionCard(tracked, snapshot, valuation, pnl, { idrRate: 16_000, autoTpTargetPct: 1.5 });
     expect(text).toContain('⚡ Auto-TP +1.5% · Cycle 2/5');
-    expect(text).toContain('OOR TP ON');
     expect(text).toContain('Rp 19.200');
+    // The state, the age, the strategy and the width of the range share the
+    // second line.
+    expect(text).toContain('IN RANGE ⏱ Age');
+    expect(text).toContain('· Spot');
 
     const off = positionCard({ ...tracked, autoTakeProfit: false, oorTakeProfit: false }, snapshot, valuation, pnl, { idrRate: 16_000 });
     expect(off).not.toContain('Auto-TP');
-    expect(off).toContain('OOR TP OFF');
   });
 
   it('offers the auto-TP and OOR toggles on the position keyboard', () => {

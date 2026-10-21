@@ -46,6 +46,43 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The position card is one screenful
+
+**Area:** bot (ui), tests
+
+**What changed**
+- **The position card now reads like this:**
+  ```
+  🟢 #10 · RAETO/USDG · Robinhood
+  IN RANGE ⏱ Age 3h · Spot 32%
+  ─────────────────────────────
+  [■■■■■■■|□□□] 69% Left
+  MC $1,19M → $1,77M · now $1,59M
+  ─────────────────────────────
+  💰 $54.85 · Fees $1.33
+  📊 +$0.7492 (+1.38%) · Rp 13.527
+  ```
+  The second line carries what the position *is*: the state, how long it has
+  been open, the strategy it was opened with and **how wide its range is** —
+  the distance between the two bounds, which is what the position is exposed
+  to. The width is read from the range label ("-33% to -1%" → 32%).
+- **The three trailing lines are gone**: the rebalance/OOR-TP line, the
+  compound/APR line and the age line all fold into the second line. The APR
+  and the compound state are not on the card any more; the OOR-TP toggle is
+  still on the position's buttons.
+- The conditional lines stay: the TP/SL rules and the auto-TP line appear
+  when they are armed — a rule you set but cannot see is a rule you forget.
+
+**Files**
+- `src/bot/ui.ts` — `rangeWidthPct` and the new second line.
+- `tests/ui.test.ts`, `tests/automation.test.ts` — the card's exact lines.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 407/407 pass (37 files)
+
+---
+
 ## 2026-10-21 — The history leaves out the dust too
 
 **Area:** bot (history), constants, tests

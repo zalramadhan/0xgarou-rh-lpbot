@@ -285,10 +285,25 @@ export function poolLine(pool: Pool, depthUsd?: number): string {
 }
 
 /**
+ * How wide the position's range is, in percent of the entry price.
+ *
+ * The range label ("-37% to -7%") says where the bounds are; the width is the
+ * distance between them — which is what the position is actually exposed to.
+ */
+export function rangeWidthPct(tracked: TrackedPosition): number | undefined {
+  const match = /([+-]?\d+(?:\.\d+)?)%\s+to\s+([+-]?\d+(?:\.\d+)?)%/.exec(tracked.rangeLabel ?? '');
+  if (!match) return undefined;
+  const low = Number(match[1]);
+  const high = Number(match[2]);
+  if (!Number.isFinite(low) || !Number.isFinite(high)) return undefined;
+  return Math.round(Math.abs(high - low));
+}
+
+/**
  * Compact position card.
  *
  *   🟢 #1 · TOKEN/USDG · Robinhood
- *   IN RANGE
+ *   IN RANGE ⏱ Age 3h · Spot 30%
  *
  *   [■■■■■■■|□□□] 67% Left
  *   MC $1.12M → $1.40M · now $1.30M
@@ -309,9 +324,19 @@ export function positionCard(
   // contradict each other.
   const status = visual.oor ? `OUT OF RANGE · ${visual.oor === 'right' ? 'RIGHT' : 'LEFT'}` : 'IN RANGE';
 
+  // The second line says what the position *is*: its state, how long it has
+  // been open, the strategy it was opened with and how wide its range is.
+  const age = fmtCompactDuration(Date.now() - tracked.entry.openedAt);
+  const rebalanced = tracked.lastRebalanceAt
+    ? ` · Last rebalance ${fmtCompactDuration(Date.now() - tracked.lastRebalanceAt)}`
+    : '';
+  const strategy = tracked.strategy === 'bidAsk' ? 'Bid Ask' : 'Spot';
+  const width = rangeWidthPct(tracked);
+  const facts = [`⏱ Age ${age}${rebalanced}`, width !== undefined ? `${strategy} ${width}%` : strategy];
+
   const lines = [
     `${statusEmoji(snapshot, pnl)} <b>${positionNumber(tracked.id)} · ${esc(pair)}</b> · Robinhood`,
-    status,
+    `${status} ${facts.join(' · ')}`,
     RANGE_FRAME,
     `${visual.bar} <b>${visual.label}</b>`,
   ];
@@ -333,17 +358,6 @@ export function positionCard(
   if (rules) lines.push(rules);
   const autoTp = autoTpLine(tracked, options.autoTpTargetPct ?? 1, options.cycleLimit ?? 3);
   if (autoTp) lines.push(autoTp);
-  lines.push(`🔄 Rebalance is manual · OOR TP ${tracked.oorTakeProfit ? 'ON' : 'OFF'}`);
-  lines.push(
-    `🧩 Compound ${tracked.autoCompound ? fmtCompactDuration(tracked.compoundIntervalMs) : 'OFF'} · APR ${
-      Number.isFinite(pnl.aprPct) ? `${pnl.aprPct.toFixed(1)}%` : '—'
-    }`,
-  );
-  const age = fmtCompactDuration(Date.now() - tracked.entry.openedAt);
-  const rebalanced = tracked.lastRebalanceAt
-    ? ` · Last rebalance ${fmtCompactDuration(Date.now() - tracked.lastRebalanceAt)}`
-    : '';
-  lines.push(`⏱ Age ${age}${rebalanced}`);
 
   return lines.join('\n');
 }
