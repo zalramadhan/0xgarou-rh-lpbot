@@ -48,6 +48,20 @@ export function nextPriceSamples(
   return [...samples, { t: now, p: price }].slice(-MAX_SAMPLES);
 }
 
+/**
+ * Whether the position was opened with a single token.
+ *
+ * The entry says how the position was funded: one side of zero means the
+ * deposit was a single token, so the range sits on one side of the market and
+ * the position waits for the price to come in.
+ */
+export function isOneSidedEntry(tracked: TrackedPosition): boolean {
+  const amount0 = BigInt(tracked.entry.amount0 || '0');
+  const amount1 = BigInt(tracked.entry.amount1 || '0');
+  if (amount0 < 0n || amount1 < 0n) return false;
+  return (amount0 === 0n) !== (amount1 === 0n);
+}
+
 /** The keyboard under an out-of-range / back-in-range alert. */
 export function alertKeyboard(id: string): InlineKeyboard {
   return new InlineKeyboard()
@@ -95,7 +109,15 @@ async function checkPosition(tracked: TrackedPosition): Promise<void> {
 
   // Alert when a position goes out of range, or comes back after being out.
   // The very first observation only alerts if it is already out of range.
-  const enteredOut = !snapshot.inRange && wasInRange !== false;
+  //
+  // A one-sided position is the exception: it waits for the price to come
+  // into its range, so it is out of range from the start. Saying so right
+  // after the entry is noise — and the advice that comes with it ("rebalance
+  // or close it") is wrong for a position that was opened that way on
+  // purpose.
+  const firstLook = wasInRange === undefined;
+  const enteredOut =
+    !snapshot.inRange && wasInRange !== false && !(firstLook && isOneSidedEntry(tracked));
   const enteredIn = snapshot.inRange && wasInRange === false;
 
   if ((enteredOut || enteredIn) && tracked.alerts && settings.alertsEnabled) {

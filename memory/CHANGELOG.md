@@ -71,6 +71,12 @@ were touched and how it was verified. See `README.md` for the format.
      either — the close withdraws the position's amounts *and* its fees.
   - The net PnL of that close now reads **+$1.81 (+3.38%)** instead of
     −$38.33 (−71.49%).
+- **A one-sided entry no longer alerts that it is out of range.** A one-sided
+  position waits for the price to come into its range, so it is out of range
+  from the start; saying so right after the entry is noise, and the advice
+  that comes with it ("rebalance or close it") is wrong for a position that
+  was opened that way on purpose. The bar still shows the state — only the
+  first-observation alert is gone.
 - **The old record was repaired** (`npm run repair:swap-pnl`): the amounts are
   read from the close's and the swap's own transactions, so the number is
   verifiable. The gross PnL was not touched — only the derived net figure.
@@ -87,10 +93,12 @@ were touched and how it was verified. See `README.md` for the format.
   old accounting.
 - `tests/entry.test.ts`, `tests/closeCosts.test.ts` — the width in the traded
   token's terms, the quote and the double-counted token.
+- `tests/oneSidedAlert.test.ts` — **new** — the one-sided entry is recognised
+  by its deposit.
 
 **Verification**
 - `npm run typecheck` — pass
-- `npm test` — 384/384 pass (33 files)
+- `npm test` — 386/386 pass (34 files)
 - Live: the -50% range on the RAETO pool reaches 50.1% away; the repaired
   record reads +$1.81 (+3.38%).
 

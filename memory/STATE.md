@@ -218,11 +218,14 @@ These are the rules that are easy to break by accident.
     (the indexer's FDV divided by the price it used for it), never by scaling a
     stale FDV with the live price — that made the bounds drift every time the
     price moved. The "now" is the live price times the supply.
-30. **The home screen is instant.** The menu draws the last view of every
+30. **A one-sided entry is not an out-of-range alert.** The position waits for
+    the price to come into its range, so it is out of range from the start.
+    The bar still shows the state; only the first-observation alert is gone.
+31. **The home screen is instant.** The menu draws the last view of every
     position, which the monitor produces on every tick. A stale view is
     refreshed in the background, a cold one is waited for; either way the menu
     never holds the user up for the chain.
-31. **The bot runs from `start.sh`, and only one copy runs.** The launcher
+32. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.
 
