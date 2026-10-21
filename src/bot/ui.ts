@@ -77,7 +77,7 @@ export function holdsOnlyUsdg(snapshot: PositionSnapshot): boolean {
 }
 
 /** The rule that frames the range block on the position screen and the alerts. */
-export const RANGE_FRAME = '─────────────────────────────';
+export const RANGE_FRAME = '────────────────────────';
 
 interface RangeVisual {
   /** "[■■■■■■■|□□□]" */

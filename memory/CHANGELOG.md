@@ -46,6 +46,25 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The divider is five characters shorter
+
+**Area:** bot (ui), tests
+
+**What changed**
+- The range divider of the position card and the alerts is five characters
+  shorter (24 instead of 29) — it was longer than the text it separated and
+  read as a wall on a phone.
+
+**Files**
+- `src/bot/ui.ts` — `RANGE_FRAME`.
+- `tests/notifyText.test.ts` — the divider's length.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 407/407 pass (37 files)
+
+---
+
 ## 2026-10-21 — The position card is one screenful
 
 **Area:** bot (ui), tests

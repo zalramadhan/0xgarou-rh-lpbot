@@ -109,7 +109,7 @@ describe('out of range notification', () => {
     const pnlLine = lines.findIndex((line) => line.includes('📊'));
     expect(mcap).toBeGreaterThan(-1);
     // The range block is framed, and the PnL follows it right away.
-    expect(lines[mcap + 1]).toBe('─────────────────────────────');
+    expect(lines[mcap + 1]).toBe('────────────────────────');
     expect(pnlLine).toBe(mcap + 2);
     expect(text).toContain('📊 +$21.00 (+40.00%)');
   });
