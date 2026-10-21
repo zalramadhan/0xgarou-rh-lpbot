@@ -240,13 +240,14 @@ These are the rules that are easy to break by accident.
     position, which the monitor produces on every tick. A stale view is
     refreshed in the background, a cold one is waited for; either way the menu
     never holds the user up for the chain.
-35. **The calendar's day view only shows what is worth a row.** A close whose
-    PnL is under $0.10 (in either direction) gets no row and does not count
-    towards the win rate — the dry-run closes used to show four "-$0.00" rows
-    and count as four losses, so a day read "Win 1/6" when two of the six ever
-    happened. A real loss still shows, because hiding it would leave the day's
-    net not matching the rows. The day's net PnL itself is unchanged: it is
-    the truth and it counts every close.
+35. **The dust rule.** A close whose PnL is under $0.10 (in either direction)
+    gets no row — in the calendar's day view or in the history — and does not
+    count towards the win rate. The dry-run closes used to show four "-$0.00"
+    rows and count as four losses, so a day read "Win 1/6" when two of the six
+    ever happened. A real loss still shows, because hiding it would leave the
+    day's net not matching the rows. The net PnL and the fees are unchanged:
+    they are the truth and they count every close. The rule lives in
+    `src/constants/dust.ts` and both screens use it.
 36. **The bot runs from `start.sh`, and only one copy runs.** The launcher
     holds a lock file; a second start says the bot is already running instead
     of letting two copies fight over the same Telegram updates.

@@ -1,5 +1,5 @@
 import { CHAINS } from '../constants/chain.js';
-import { MIN_CALENDAR_ROW_PNL_USD } from '../constants/calendar.js';
+import { isDust } from '../constants/dust.js';
 import { store, type ClosedRecord } from '../store/store.js';
 import {
   closeReasonLabel,
@@ -153,7 +153,7 @@ export function positionPnl(record: ClosedRecord, currency: CalendarCurrency): n
 /** True when the position is worth a row of its own. */
 export function isWorthACalendarRow(position: CalendarPosition): boolean {
   if (position.missing) return true;
-  return Math.abs(position.pnlUsd) >= MIN_CALENDAR_ROW_PNL_USD;
+  return !isDust(position.pnlUsd);
 }
 
 function toPosition(record: ClosedRecord, currency: CalendarCurrency): CalendarPosition {

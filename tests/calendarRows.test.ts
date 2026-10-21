@@ -10,7 +10,8 @@ process.env.DRY_RUN = 'true';
 
 const { store } = await import('../src/store/store.js');
 const { buildCalendarPayload } = await import('../src/core/calendar.js');
-const { MIN_CALENDAR_ROW_PNL_USD } = await import('../src/constants/calendar.js');
+const { MIN_DUST_PNL_USD, isDust } = await import('../src/constants/dust.js');
+const { historyText } = await import('../src/bot/historyFlow.js');
 
 const CHAT_ID = 515_151;
 let chat = CHAT_ID;
@@ -113,7 +114,36 @@ describe('a day in the calendar', () => {
     expect(payload.netPnlUsd).toBeCloseTo(1.52, 6);
   });
 
+  it('leaves the dust out of the history as well', async () => {
+    // The history is the same list: the dust rows and the dust buttons go.
+    await close(-0.000001, 'USDG/RAETO');
+    await close(-0.000001, 'USDG/IGNITION');
+    await close(1.883, 'USDG/IGNITION');
+
+    const text = historyText(chat, 0);
+    // The two real closes are listed, the dust is not.
+    expect(text).toContain('$1.88');
+    expect(text).not.toContain('-$0.00');
+    // The win rate counts what is shown.
+    expect(text).toContain('Win rate 100%');
+    // The net is still the truth.
+    expect(text).toContain('net PnL <b>$1.88</b>');
+  });
+
+  it('says so when every close is dust', async () => {
+    await close(-0.000001, 'USDG/RAETO');
+    const text = historyText(chat, 0);
+    expect(text).toContain('worth less than $0.10');
+    expect(text).not.toContain('No closed positions yet');
+  });
+
   it('uses a threshold of ten cents', () => {
-    expect(MIN_CALENDAR_ROW_PNL_USD).toBe(0.1);
+    expect(MIN_DUST_PNL_USD).toBe(0.1);
+    expect(isDust(0.09)).toBe(true);
+    expect(isDust(-0.09)).toBe(true);
+    expect(isDust(0.1)).toBe(false);
+    expect(isDust(-2.5)).toBe(false);
+    // A PnL that is unknown is not dust: it is shown as missing.
+    expect(isDust(Number.NaN)).toBe(false);
   });
 });

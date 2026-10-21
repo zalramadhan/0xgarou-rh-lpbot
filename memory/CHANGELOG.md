@@ -46,6 +46,33 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The history leaves out the dust too
+
+**Area:** bot (history), constants, tests
+
+**What changed**
+- **The history screen uses the same rule as the calendar.** A close whose PnL
+  is under $0.10 gets no row and no button, and it does not count towards the
+  win rate — the four dry-run closes were "-$0.00" rows and four fake losses,
+  so the history read "Win rate 33%" when both of the real closes were wins.
+- **The net PnL and the fees still count every close** — they are the truth.
+- **A history that only holds dust says so** ("Every close so far is worth
+  less than $0.10") instead of claiming that nothing was closed.
+- The rule now lives in one place (`src/constants/dust.ts`) and both screens
+  use it.
+
+**Files**
+- `src/constants/dust.ts` — the shared rule (renamed from `calendar.ts`).
+- `src/bot/historyFlow.ts` — the rows, the buttons and the win rate.
+- `tests/calendarRows.test.ts` — the history cases.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 406/406 pass (37 files)
+- Live: the history lists the two real closes and reads "Win rate 100%".
+
+---
+
 ## 2026-10-21 — The calendar's day view leaves out the dust
 
 **Area:** core (calendar), card (calendar), constants, tests

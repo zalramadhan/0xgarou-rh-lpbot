@@ -1,4 +1,4 @@
-import { MIN_CALENDAR_ROW_PNL_USD } from '../constants/calendar.js';
+import { MIN_DUST_PNL_USD } from '../constants/dust.js';
 import { formatCompactAmount, formatDuration, NA } from './format.js';
 import {
   BACKGROUND,
@@ -451,7 +451,7 @@ function dayView(payload: CalendarPayload): string[] {
     // row. Saying "nothing was closed" then would be a lie.
     const message =
       payload.totalPositions > 0
-        ? `Semua PnL hari ini di bawah $${MIN_CALENDAR_ROW_PNL_USD.toFixed(2)}.`
+        ? `Semua PnL hari ini di bawah $${MIN_DUST_PNL_USD.toFixed(2)}.`
         : 'Tidak ada posisi yang ditutup di hari ini.';
     parts.push(
       centered(message, BODY_TOP + 120, 26, {

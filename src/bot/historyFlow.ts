@@ -1,6 +1,7 @@
 import { InlineKeyboard, type Context } from 'grammy';
 import { answer } from './answers.js';
 import { store, type ClosedRecord } from '../store/store.js';
+import { isDust, MIN_DUST_PNL_USD } from '../constants/dust.js';
 import { fmtIdr } from '../core/fx.js';
 import { esc, fmtDuration, fmtPct, fmtPrice, fmtUsd } from '../utils/format.js';
 import { txLink } from './ui.js';
@@ -41,8 +42,20 @@ function shortDate(ts: number): string {
 }
 
 export function historyText(chatId: number, page = 0): string {
-  const all = store.historyFor(chatId);
+  const closed = store.historyFor(chatId);
+  // A close that is worth less than a few cents is dust: it says nothing, and
+  // it must not count as a loss either. The same rule the calendar uses.
+  const all = closed.filter((record) => !isDust(record.pnlUsd));
   if (all.length === 0) {
+    if (closed.length > 0) {
+      return [
+        '📜 <b>History</b>',
+        '────────────',
+        `🫙 Every close so far is worth less than $${MIN_DUST_PNL_USD.toFixed(2)}.`,
+        '',
+        `📦 ${closed.length} position${closed.length === 1 ? '' : 's'} closed, all of them dust.`,
+      ].join('\n');
+    }
     return [
       '📜 <b>History</b>',
       '────────────',
@@ -56,16 +69,18 @@ export function historyText(chatId: number, page = 0): string {
   const current = Math.min(Math.max(0, page), pages - 1);
   const rows = all.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
 
-  const pnlUsd = all.reduce((sum, r) => sum + r.pnlUsd, 0);
-  const feesUsd = all.reduce((sum, r) => sum + r.feesUsd, 0);
+  // The net and the fees count every close: they are the truth.
+  const pnlUsd = closed.reduce((sum, r) => sum + r.pnlUsd, 0);
+  const feesUsd = closed.reduce((sum, r) => sum + r.feesUsd, 0);
   const wins = all.filter((r) => r.pnlUsd > 0).length;
-  const rate = all.find((r) => Number.isFinite(r.idrRate))?.idrRate ?? Number.NaN;
+  const winRate = all.length > 0 ? (wins / all.length) * 100 : 0;
+  const rate = closed.find((r) => Number.isFinite(r.idrRate))?.idrRate ?? Number.NaN;
 
   return [
     '📜 <b>History</b>',
     '────────────',
     `🏁 Closed: <b>${all.length}</b> · 📈 net PnL <b>${fmtUsd(pnlUsd)}</b> (💵 ${fmtIdr(pnlUsd, rate)})`,
-    `🎯 Win rate ${((wins / all.length) * 100).toFixed(0)}% · 💧 fees ${fmtUsd(feesUsd)}`,
+    `🎯 Win rate ${winRate.toFixed(0)}% · 💧 fees ${fmtUsd(feesUsd)}`,
     '────────────',
     ...rows.map(historyRow),
     '',
@@ -74,7 +89,7 @@ export function historyText(chatId: number, page = 0): string {
 }
 
 function historyKeyboard(chatId: number, page = 0): InlineKeyboard {
-  const all = store.historyFor(chatId);
+  const all = store.historyFor(chatId).filter((record) => !isDust(record.pnlUsd));
   const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
   const current = Math.min(Math.max(0, page), pages - 1);
   const kb = new InlineKeyboard();
