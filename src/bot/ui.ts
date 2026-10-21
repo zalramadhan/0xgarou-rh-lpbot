@@ -1,6 +1,7 @@
 import { InlineKeyboard } from 'grammy';
 import { BID_ASK_ENTRY_CHOICES } from '../constants/bidAsk.js';
 import { AUTO_SWAP_MIN_CHOICES } from '../constants/autoSwap.js';
+import { ROUTE_DISCOUNT_CHOICES } from '../constants/routeImpact.js';
 import { DISPLAY_CURRENCIES } from '../constants/currency.js';
 import { TIME_ZONES } from '../constants/timezone.js';
 import { TOKENS } from '../constants/chain.js';
@@ -457,6 +458,7 @@ export function settingsText(
     `🔔 Range alerts: ${settings.alertsEnabled ? 'on' : 'off'} (out of range, back in range)`,
     `💱 Auto-swap to USDG: ${settings.autoSwapToUsdg ? 'on — proceeds are swapped after a live close' : 'off'}`,
     `   smallest swap: $${settings.autoSwapMinUsd.toFixed(2)}`,
+    `🛡 Route impact: at most <b>${settings.maxRouteDiscountPct}%</b> below the market`,
     `⚡ Auto-TP target: +${settings.autoTpTargetPct}%`,
     `🔄 Default cycles: ${settings.tpCycleLimit}`,
     `📊 Bid Ask entries: ${settings.bidAskEntries} (one-sided ladders)`,
@@ -480,6 +482,8 @@ export function settingsKeyboard(settings: ChatSettings): InlineKeyboard {
     .row()
     .text(`💱 Auto-swap ${settings.autoSwapToUsdg ? '✅' : '❌'}`, 'set:autoSwap')
     .text(`💴 Swap ≥ $${settings.autoSwapMinUsd.toFixed(2)}`, 'set:swapMin')
+    .row()
+    .text(`🛡 Impact ≤ ${settings.maxRouteDiscountPct}%`, 'set:swapImpact')
     .row()
     .text(`⚡ TP target +${settings.autoTpTargetPct}%`, 'set:autoTp')
     .text(`🔄 Cycles ${settings.tpCycleLimit}`, 'set:cycles')
@@ -596,6 +600,30 @@ export function autoSwapMinKeyboard(current: number): InlineKeyboard {
   for (const amount of AUTO_SWAP_MIN_CHOICES) {
     const label = `$${amount.toFixed(2)}`;
     kb.text(amount === current ? `${label} ✅` : label, `set:swapMin:${amount}`);
+  }
+  kb.row().text('◀ Back to settings', 'set:back');
+  return withHome(kb);
+}
+
+/** Settings -> how far below the market a swap route may be priced. */
+export function routeImpactText(current: number): string {
+  return [
+    '🛡 <b>Route impact</b>',
+    '────────────',
+    `Current: at most <b>${current}%</b> below the market`,
+    '',
+    'A swap route is priced against the market. When it is more than this far below, the tokens stay in your wallet instead: the route would cost more than swapping them by hand.',
+    `On a $55 position, ${current}% is $${(55 * current / 100).toFixed(2)} — a swap by hand costs about $0.02 of gas.`,
+    '────────────',
+    '👇 Pick a limit:',
+  ].join('\n');
+}
+
+export function routeImpactKeyboard(current: number): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (const pct of ROUTE_DISCOUNT_CHOICES) {
+    const label = `${pct}%`;
+    kb.text(pct === current ? `${label} ✅` : label, `set:swapImpact:${pct}`);
   }
   kb.row().text('◀ Back to settings', 'set:back');
   return withHome(kb);

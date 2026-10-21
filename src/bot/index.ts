@@ -42,6 +42,8 @@ import { showHelp, showSettings, showStatus, showWallet } from './screens.js';
 import {
   autoSwapMinKeyboard,
   autoSwapMinText,
+  routeImpactKeyboard,
+  routeImpactText,
   bidAskConfirmKeyboard,
   bidAskConfirmText,
   bidAskEntriesKeyboard,
@@ -55,6 +57,7 @@ import {
 } from './ui.js';
 import { isValidBidAskEntries } from '../constants/bidAsk.js';
 import { normalizeAutoSwapMin } from '../constants/autoSwap.js';
+import { normalizeRouteDiscount } from '../constants/routeImpact.js';
 import { normalizeCurrency } from '../constants/currency.js';
 import { normalizeTimeZone } from '../constants/timezone.js';
 import { handleMenuCallback, showMenu } from './menu.js';
@@ -485,6 +488,21 @@ async function handleSettingsCallback(ctx: Context, data: string): Promise<void>
     }
     await store.updateSettings(chatId, { currency: next });
     await answer(ctx, { text: `Display currency: ${next}` });
+  } else if (key === 'swapImpact') {
+    if (!value) {
+      await answer(ctx);
+      await ctx
+        .editMessageText(routeImpactText(settings.maxRouteDiscountPct), {
+          parse_mode: 'HTML',
+          reply_markup: routeImpactKeyboard(settings.maxRouteDiscountPct),
+          link_preview_options: { is_disabled: true },
+        })
+        .catch(() => undefined);
+      return;
+    }
+    const next = normalizeRouteDiscount(Number(value));
+    await store.updateSettings(chatId, { maxRouteDiscountPct: next });
+    await answer(ctx, { text: `Route impact: at most ${next}% below the market` });
   } else if (key === 'swapMin') {
     if (!value) {
       await answer(ctx);

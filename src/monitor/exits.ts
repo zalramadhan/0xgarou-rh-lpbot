@@ -143,6 +143,7 @@ async function autoSwap(
     // The live market price, so a route that is priced far below it is
     // refused instead of taken.
     sellTokenUsd: marketPriceUsd(snapshot, valuation),
+    maxDiscountPct: settings.maxRouteDiscountPct,
   });
   return { note: outcome.note, outcome };
 }

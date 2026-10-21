@@ -217,9 +217,13 @@ These are the rules that are easy to break by accident.
     IGNITION, about $1.39, in the IGNITION close). The amount the bot shows is
     the amount it swaps.
 30. **A route has to be near the market.** The 0x quote's own rate is compared
-    with the live pool price; more than 3% below it and the tokens stay in the
-    wallet with a note that says why. The comparison uses the pool's price,
-    not the price feed — the feed is minutes old on a busy token.
+    with the live pool price; more than the chat's limit (⚙️ Settings → 🛡
+    Route impact, 2% by default) below it and the tokens stay in the wallet
+    with a note that says why. The comparison uses the pool's price, not the
+    price feed — the feed is minutes old on a busy token. The **slippage** is a
+    different thing: it is the protection against the price moving between the
+    quote and the mining, and it stays at 1% — tightening it only buys reverts
+    with burnt gas.
 31. **A token with no v3 pool is told before the close.** The V3 route cannot
     swap a token that only trades in v4 pools, and the user should hear that
     before the position is closed, not after.

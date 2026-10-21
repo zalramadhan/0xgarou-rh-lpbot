@@ -9,6 +9,7 @@ import { isRevertError } from '../utils/errors.js';
 import { findPools } from './pools.js';
 import { usdPrice } from './prices.js';
 import { quoteV3 } from './quoter.js';
+import { DEFAULT_MAX_ROUTE_DISCOUNT_PCT } from '../constants/routeImpact.js';
 import type { TokenInfo } from './tokens.js';
 import { ensureErc20Allowance, erc20BalanceOf } from './wallet.js';
 import type { TxOutcome } from './actions.js';
@@ -21,13 +22,6 @@ import {
 } from './zeroXSwap.js';
 
 const log = createLogger('swap');
-
-/**
- * How far below the market a route may be priced before the swap is
- * refused. A healthy route on a thin token is one to one and a half percent
- * off; three percent is already a bad route.
- */
-const MAX_ROUTE_DISCOUNT_PCT = 3;
 
 /**
  * How far below the market a route is priced, in percent.
@@ -98,6 +92,24 @@ export const SWAP_ROUTE_LABEL: Record<SwapRoute, string> = {
 };
 
 /**
+ * The other route, when this one was refused and the other one can work.
+ *
+ * A route that was refused (too far below the market, or nothing worth
+ * swapping) is not a failure of the swap — the other route may still do it.
+ * The V3 route only counts when the token has a v3 pool at all.
+ */
+export function otherRouteAfterRefusal(
+  route: SwapRoute,
+  refused: boolean,
+  v3Available: boolean,
+): SwapRoute | undefined {
+  if (!refused) return undefined;
+  const other: SwapRoute = route === '0x' ? 'uniswap-v3' : '0x';
+  if (other === 'uniswap-v3' && !v3Available) return undefined;
+  return other;
+}
+
+/**
  * Swaps the position's own token proceeds into USDG.
  *
  * With `route: 'auto'` (the default) 0x is tried first and the Uniswap v3
@@ -128,6 +140,11 @@ export async function swapProceedsToUsdg(options: {
    * that looks like a swap. The tokens stay in the wallet instead.
    */
   sellTokenUsd?: number;
+  /**
+   * How far below the market the route may be priced, in percent. Above it
+   * the swap is refused and the tokens stay in the wallet.
+   */
+  maxDiscountPct?: number;
   /** The route to use. `auto` tries 0x first and falls back to v3. */
   route?: SwapRoute | 'auto';
 }): Promise<SwapOutcome> {
@@ -186,6 +203,8 @@ async function swapViaZeroX(
     buyTokenUsd: number;
     /** The market price of the sold token, in USD. */
     sellTokenUsd?: number;
+    /** How far below the market the route may be priced, in percent. */
+    maxDiscountPct?: number;
   },
   sellAmount: bigint,
 ): Promise<SwapOutcome & { submitted?: boolean }> {
@@ -230,21 +249,23 @@ async function swapViaZeroX(
     // live price of the pool. A thin route can quote 5-10% below, and taking
     // it would quietly cost a tenth of the position.
     const market = options.sellTokenUsd;
+    const limit = options.maxDiscountPct ?? DEFAULT_MAX_ROUTE_DISCOUNT_PCT;
     if (market !== undefined && Number.isFinite(market) && market > 0) {
       const soldHuman = Number(quote.sellAmount) / 10 ** token.decimals;
       const boughtUsd = (Number(quote.buyAmount) / 1e6) * options.buyTokenUsd;
       const impliedUsd = soldHuman > 0 ? boughtUsd / soldHuman : Number.NaN;
       const below = routeDiscountPct(impliedUsd, market);
       if (Number.isFinite(below)) {
-        if (below > MAX_ROUTE_DISCOUNT_PCT) {
+        if (below > limit) {
           return {
             ok: false,
             route: '0x',
             skipped: true,
             quote,
             note:
-              `🏏 The 0x route is ${below.toFixed(1)}% below the market ($${impliedUsd.toFixed(6)} against $${market.toFixed(6)})` +
-              ' — the tokens stayed in your wallet.',
+              `🏏 The 0x route is ${below.toFixed(1)}% below the market` +
+              ` ($${impliedUsd.toFixed(6)} against $${market.toFixed(6)}, limit ${limit}%)` +
+              ' — the tokens stayed in your wallet. Sell them yourself if you want them as USDG.',
             error: 'the route is too far below the market',
           };
         }

@@ -9,6 +9,7 @@ import {
 import { normalizeCurrency } from '../constants/currency.js';
 import { DEFAULT_TIME_ZONE, normalizeTimeZone } from '../constants/timezone.js';
 import { DEFAULT_AUTO_SWAP_MIN_USD, normalizeAutoSwapMin } from '../constants/autoSwap.js';
+import { DEFAULT_MAX_ROUTE_DISCOUNT_PCT, normalizeRouteDiscount } from '../constants/routeImpact.js';
 import type { PositionVersion } from '../core/positions.js';
 
 const log = createLogger('store');
@@ -182,6 +183,13 @@ export interface ChatSettings {
    * more gas on the swap than the swap is worth.
    */
   autoSwapMinUsd: number;
+  /**
+   * How far below the market a swap route may be priced, in percent.
+   *
+   * Above it the tokens stay in the wallet: the route would cost more than
+   * swapping them by hand.
+   */
+  maxRouteDiscountPct: number;
   /** Profit % that arms an auto take-profit close. */
   autoTpTargetPct: number;
   /** Default cycle limit for new positions (the initial position is cycle 1). */
@@ -323,6 +331,7 @@ class Store {
         currency: 'USD',
         timezone: DEFAULT_TIME_ZONE,
         autoSwapMinUsd: DEFAULT_AUTO_SWAP_MIN_USD,
+        maxRouteDiscountPct: DEFAULT_MAX_ROUTE_DISCOUNT_PCT,
       };
       return {
         ...defaults,
@@ -331,6 +340,7 @@ class Store {
         currency: normalizeCurrency(existing.currency),
         timezone: normalizeTimeZone(existing.timezone),
         autoSwapMinUsd: normalizeAutoSwapMin(existing.autoSwapMinUsd),
+        maxRouteDiscountPct: normalizeRouteDiscount(existing.maxRouteDiscountPct),
       };
     }
     const fresh: ChatSettings = {
@@ -344,6 +354,7 @@ class Store {
       currency: 'USD',
       timezone: DEFAULT_TIME_ZONE,
       autoSwapMinUsd: DEFAULT_AUTO_SWAP_MIN_USD,
+      maxRouteDiscountPct: DEFAULT_MAX_ROUTE_DISCOUNT_PCT,
     };
     this.data.chats[String(chatId)] = fresh;
     return fresh;
@@ -362,6 +373,9 @@ class Store {
     }
     if (patch.autoSwapMinUsd !== undefined) {
       next.autoSwapMinUsd = normalizeAutoSwapMin(patch.autoSwapMinUsd);
+    }
+    if (patch.maxRouteDiscountPct !== undefined) {
+      next.maxRouteDiscountPct = normalizeRouteDiscount(patch.maxRouteDiscountPct);
     }
     this.data.chats[String(chatId)] = next;
     await this.persist();

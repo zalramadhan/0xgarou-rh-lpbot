@@ -6,6 +6,7 @@ import { botAddress } from '../chain/client.js';
 import { config } from '../config.js';
 import { collectFees } from '../core/actions.js';
 import {
+  otherRouteAfterRefusal,
   swapProceedsToUsdg,
   SWAP_ROUTE_LABEL,
   type SwapOutcome,
@@ -499,6 +500,7 @@ async function handleCloseStep(
 
   let note: string | undefined;
   let swapped = false;
+  let refused = false;
   try {
     const outcome = await swapProceedsToUsdg({
       token: session.token,
@@ -513,9 +515,13 @@ async function handleCloseStep(
       // The live market price, so a route that is priced far below it is
       // refused instead of taken.
       sellTokenUsd: session.marketUsd,
+      maxDiscountPct: settings.maxRouteDiscountPct,
       route,
     });
     swapped = outcome.ok;
+    // A route that was refused is not a failure: the other route may still
+    // work, so the choice is offered again.
+    refused = !outcome.ok && outcome.skipped === true;
     note = outcome.ok ? outcome.note : await swapFailureNote(outcome, session.token, owner);
     if (outcome.ok) {
       note = await recordSwap(ctx, session, outcome, note);
@@ -527,6 +533,39 @@ async function handleCloseStep(
       owner,
     );
   }
+  // The other route, when this one was refused and the other one can work.
+  const otherRoute = otherRouteAfterRefusal(route, refused, session.v3Route !== false);
+
+  if (otherRoute) {
+    // The session stays: the user can try the other route right away.
+    setSession(chatId, { ...session, step: 'closeRoute' });
+    await ctx.api
+      .editMessageText(chatId, status.message_id, note, { parse_mode: 'HTML' })
+      .catch(() => undefined);
+    await ctx
+      .reply(
+        [
+          '❌ <b>The swap did not go through</b>',
+          note,
+          '',
+          'The position itself was closed — see the receipt above.',
+          '',
+          `Try the ${SWAP_ROUTE_LABEL[otherRoute]} route instead?`,
+        ].join('\n'),
+        {
+          parse_mode: 'HTML',
+          reply_markup: new InlineKeyboard()
+            .text(`🔄 ${SWAP_ROUTE_LABEL[otherRoute]}`, `act:closeRoute:${session.positionId}:${otherRoute}`)
+            .row()
+            .text('💎 Keep the tokens', `act:closeKeep:${session.positionId}`)
+            .row()
+            .text('🏠 Menu', 'menu:home'),
+        },
+      )
+      .catch(() => undefined);
+    return;
+  }
+
   clearSession(chatId);
   await ctx.api
     .editMessageText(chatId, status.message_id, note, { parse_mode: 'HTML' })

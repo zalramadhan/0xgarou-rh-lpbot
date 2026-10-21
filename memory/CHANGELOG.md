@@ -46,6 +46,45 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-21 — The route impact limit is 2%, and it is a setting
+
+**Area:** core (swap, routeImpact), bot (settings, close flow), store, tests
+
+**What changed**
+- **The price-impact limit is 2% and it lives in the settings**
+  (⚙️ Settings → 🛡 Route impact, 1/2/3/5%). A route that is priced more than
+  that far below the live market is refused: the tokens stay in the wallet
+  instead of being sold at a loss that looks like a swap. On a $55 position 2%
+  is $1.10, while swapping by hand costs about $0.02 of gas.
+- **The slippage stays at 1%** — it is the protection against the price moving
+  between the quote and the mining, and tightening it only buys reverts with
+  burnt gas. The price impact is where the money actually goes.
+- **The refusal says what to do**: the route's price against the market, the
+  limit, that the tokens are in the wallet, and that selling them by hand is
+  the way to get them as USDG.
+- **The close flow offers the other route** when one is refused. A refusal is
+  not a failure of the swap — the other route may still do it. The V3 route is
+  only offered when the token has a v3 pool at all (IGNITION does not, so it
+  says so before the close).
+- With the limit in place the bot now **prefers a v3 route over a thin 0x
+  route** for the tokens that have one: the v3 impact is only the pool's fee.
+
+**Files**
+- `src/constants/routeImpact.ts` — **new** — the default, the choices, the
+  normalizer.
+- `src/core/swap.ts` — the limit comes from the options;
+  `otherRouteAfterRefusal`.
+- `src/store/store.ts` — `maxRouteDiscountPct` per chat.
+- `src/bot/ui.ts`, `src/bot/index.ts` — the settings screen and the callback.
+- `src/bot/positionsFlow.ts` — the refusal message and the other route.
+- `tests/routeImpact.test.ts` — **new**.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 399/399 pass (36 files)
+
+---
+
 ## 2026-10-21 — The swap sells the whole withdrawal, and a bad route is refused
 
 **Area:** core (positions, swap, valuation, pools), bot (close flow), monitor (exits), tests

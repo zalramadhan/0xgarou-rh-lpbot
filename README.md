@@ -24,7 +24,7 @@ one-tap rebalance.
 | Speed | Every button answers its callback query **before** it does any work, a screen that takes a moment shows a `⏳` note, and the market cap is cached and refreshed in the background — one tap is always enough |
 | Alerts | 🟢 back-in-range / 🔴 out-of-range DMs with action buttons (🔄 Refresh, 🤖 Check LP Agent, 📈 View Chart on GMGN). A master switch for both lives in the **main menu** (🔕 Range alerts off) and in **⚙️ Settings** |
 | Automate | Auto-compound fees on an interval, TP/SL, ⚡ auto-TP with re-entry cycles, 📈 OOR take profit — each toggleable per position. **The rebalance is manual**: 🔁 Rebalance now closes the position and re-mints it with the same width and the same side, on the live price |
-| Proceeds | 💱 optional auto-swap of closed token proceeds into USDG, routed by the **0x Swap API** (v3 + v4 + RFQ liquidity), only above a minimum amount you set (default $0.30) |
+| Proceeds | 💱 optional auto-swap of closed token proceeds into USDG, routed by the **0x Swap API** (v3 + v4 + RFQ liquidity), only above a minimum amount you set (default $0.30) and only through a route that is at most 2 % below the market |
 | History | 📜 every close is frozen as a record: reason, cycle, PnL in **USD and IDR** (rate captured at close) |
 | Profit calendar | 📅 realized profit per month, week and day as a 1080x1350 calendar image: tinted day cells, weekly totals, a diverging week chart and the positions of a day |
 | PnL card | 🖼 a 1080x1350 receipt image for every closed position: net realized PnL, ROI, market caps, the range and the price chart, rendered from the frozen close record so it never changes |
@@ -146,7 +146,7 @@ edits the same message instead of posting a new one, so the chat stays one messa
 | `/safety <CA>` | Buy/sell simulation, mint/blacklist bytecode checks before you commit |
 | `/wallet` | Bot wallet address, ETH/USDG/WETH balances, import / rename / unlock |
 | `/book` | Address book of saved token CAs: tap to scan, add, search, remove |
-| `/settings` | Dry-run toggle, slippage, alerts, auto-swap, auto-TP target, default cycles, Bid Ask entry count, display currency, calendar timezone |
+| `/settings` | Dry-run toggle, slippage, alerts, auto-swap, route impact limit, auto-TP target, default cycles, Bid Ask entry count, display currency, calendar timezone |
 | `/importwallet` · `/unlock` · `/rename` | Encrypted keystore: import a key, unlock it for trading, rename the wallet |
 | `/status` | RPC host, block, gas price, tracked count |
 | `/cancel` | Abort the current flow |
@@ -376,6 +376,13 @@ After a **live** close, the token side of the position is swapped into USDG:
   chat's slippage (1 % by default).
 - The swap only happens when the leftover is worth more than the configured
   minimum (**$0.30** by default) **after** the 0x fees and the estimated gas.
+- **The route has to be near the market.** The quote's own rate is compared
+  with the live pool price, and a route more than **2 %** below the market
+  (⚙️ Settings → 🛡 Route impact) is refused: the tokens stay in the wallet
+  instead of being sold at a loss that looks like a swap. On a $55 position 2 %
+  is $1.10, while swapping by hand costs about $0.02 of gas.
+- The swap sells the **whole withdrawal** — the position's amounts *and* the
+  fees the close collected.
 - It never runs for a position that is about to be re-entered by ⚡ Auto-TP —
   the re-entry needs those tokens — and never in dry-run.
 - A failed quote falls back to the old Uniswap v3 route, but only when nothing
