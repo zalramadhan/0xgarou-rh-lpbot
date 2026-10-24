@@ -5,6 +5,39 @@ were touched and how it was verified. See `README.md` for the format.
 
 ---
 
+## 2026-10-24 — A range above the market no longer starts on the live tick
+
+**Area:** core (tick math), tests
+
+**What changed**
+- **A one-sided range above the market could start on the live tick.** When
+  the pool's tick was a multiple of the spacing, `alignTickUp` returned the
+  tick itself, so `reanchorRange(..., 'up')` and `oneSidedTicks(..., above)`
+  produced `tickLower == tick`. Uniswap counts `tickLower <= tick < tickUpper`
+  as in range, so the mint needed token1 as well, and a token0-only deposit
+  planned zero liquidity. `reanchorRange` also disagreed with its own check:
+  calling it again on its result moved the range again.
+- The near bound of a range above the market is now the first aligned tick
+  strictly above the live tick (`alignTickDown(tick) + spacing`).
+- The comments describing which token Uniswap takes on each side of a range
+  had the two sides swapped; corrected.
+
+**Why**
+- The live tick sits on the spacing once every `spacing` ticks, and the open
+  flow and the re-entry after a close both pass through `reanchorRange`.
+
+**Files**
+- `src/core/math/tickMath.ts` — `reanchorRange` ('up') and `oneSidedTicks`
+  (above): strict near bound; comment.
+- `src/bot/newFlow.ts` — comment.
+- `tests/alignedTick.test.ts` — the aligned-tick case for both helpers.
+
+**Verification**
+- `npm run typecheck` — pass
+- `npm test` — 415/415 pass (39 files; fails 2 before the fix)
+
+---
+
 ## 2026-10-21 — The market cap of a range bound stops drifting
 
 **Area:** core (scanner, pairs), bot (ui, flows), monitor (alerts), tests

@@ -122,8 +122,9 @@ export function fullRangeTicks(spacing: number): TickRange {
  * A range that sits entirely on one side of the live price, so the deposit is
  * funded in a single token.
  *
- * Uniswap takes `token0` when the price is at or above the upper bound, and
- * `token1` when it is at or below the lower bound. The bound that touches the
+ * Uniswap takes only `token0` while the live tick is below the lower bound,
+ * and only `token1` once it is at or above the upper bound (a position is in
+ * range when `tickLower <= tick < tickUpper`). The bound that touches the
  * live price therefore has to be aligned *away* from it — down for the upper
  * bound, up for the lower one — or the range straddles the price and the mint
  * quietly demands both tokens.
@@ -165,9 +166,11 @@ export function oneSidedTicks(
   const far = priceToTick(farPrice, dec0, dec1);
 
   if (above) {
-    // The range sits above the price: the near bound is aligned up, the far
-    // bound is aligned up as well, so the range is at least as wide as asked.
-    const tickLower = alignTickUp(current, spacing);
+    // The range sits above the price: the near bound is the first aligned tick
+    // strictly above it (Uniswap counts `tick == tickLower` as in range, so a
+    // live tick on the spacing must not become the lower bound); the far bound
+    // is aligned up as well, so the range is at least as wide as asked.
+    const tickLower = alignTickDown(current, spacing) + spacing;
     const tickUpper = Math.max(tickLower + spacing, alignTickUp(far, spacing));
     return { tickLower, tickUpper: clampTick(tickUpper) };
   }
@@ -198,7 +201,9 @@ export function reanchorRange(
   if (direction === 'up') {
     // The range has to stay above the market.
     if (range.tickLower > currentTick) return { ...range, changed: false };
-    const near = alignTickUp(currentTick, spacing);
+    // Strictly above: when the live tick sits on the spacing, aligning it up
+    // returns the tick itself, which Uniswap counts as in range.
+    const near = alignTickDown(currentTick, spacing) + spacing;
     return { tickLower: near, tickUpper: near + width, changed: true };
   }
   if (direction === 'down') {
