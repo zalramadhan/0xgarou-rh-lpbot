@@ -84,9 +84,9 @@ function quoteOf(pool: Pool, token: TokenInfo): TokenInfo {
 
 /**
  * A one-sided deposit must hold exactly one token, so the range has to sit
- * entirely on one side of the live price. Uniswap hands you `token0` when the
- * price is at or above the upper bound and `token1` when it is at or below the
- * lower bound, so the side that touches the live price is aligned away from it.
+ * entirely on one side of the live price. Uniswap takes only `token0` while the
+ * live tick is below the lower bound and only `token1` once it is at or above
+ * the upper bound, so the side that touches the live price is aligned away from it.
  */
 function oneSidedTicksFor(
   pool: Pool,
